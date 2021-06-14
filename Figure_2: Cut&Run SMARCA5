@@ -1,0 +1,196 @@
+##Trimming and aligments of raw files
+
+```{bash}
+#Trimmomatic 
+java -classpath /Users/yuezhao/Software/Trimmomatic-0.32/trimmomatic-0.32.jar org.usadellab.trimmomatic.TrimmomaticPE -phred33 \
+4617-MB-1_S71_L005_R1_001.fastq.gz 4617-MB-1_S71_L005_R2_001.fastq.gz \
+4617-MB-1_R1.noadap.paired.txt 4617-MB-1_R1.noadap.unpaired.txt 4617-MB-1_R2.noadap.paired.txt 4617-MB-1_R2.noadap.unpaired.txt \
+ILLUMINACLIP:TruSeq_CD_adapter.txt:2:30:7 LEADING:15 TRAILING:15 MINLEN:15
+
+
+#Bowtie
+nohup bowtie2 -p 8 --local --very-sensitive-local --no-unal --no-mixed --no-discordant --phred33 -I 10 -X 700 --no-overlap --no-dovetail -x /Volumes/Mbomber_SeqData/hg19_scer_genomes/Bowtie2Index/hg19_sc \
+-1 4617-MB-1_R1.noadap.paired.txt -2 4617-MB-1_R2.noadap.paired.txt -S 4617-MB-1.hg19scer.sam 
+
+
+```
+
+```{bash}
+# Example Macs2 peak calling:
+
+macs2 callpeak -t ../../4617_bam/4617-MB-8.hg19.sorted.F4q10.bam -f BAMPE -q 0.001 -g hs --keep-dup all -n 4617-MB-8-BAMPE.q0.001.keepdupall
+
+# Example removed black list:
+bedtools intersect -v -abam 4617-MB-6.BAMPE.q0.1.SPMR.callsummits.keepdupall_peaks.narrowPeak -b /Volumes/BombXtreme/hg19_scer_genomes/hg19_blacklist/hg19.blacklistpeaks.bed > 4617-MB-6.BAMPE.q0.1.SPMR.callsummits.keepdupall_peaks.BLfiltered.narrowPeak
+```
+##Libraries used for R
+```{r}
+library("DiffBind")
+packageVersion("DiffBind")
+
+library("DESeq2")
+packageVersion("DESeq2")
+
+library(tidyverse)
+library(readr)
+library(dplyr)
+
+```
+## Load sample data table
+```{r}
+
+CutandRunqv0.001 <- data.frame(SampleIDb= c("minusdT_A","minusdT_B","plusdT_A","plusdT_B"),
+                            Tissue = c("Kasumi", "Kasumi", "Kasumi", "Kasumi"), 
+                            Factor = c("SMARCA5", "SMARCA5", "SMARCA5", "SMARCA5"), 
+                            Condition = c("minusdT","minusdT","plusdT","plusdT"),
+                            Treatment = c("0","0","dT","dT"), 
+                            Replicate = c("1","2","1","2"),
+                            bamReads = c("/Volumes/BombXtreme/4617/4617_bam/4617-MB-5.hg19.32020.sorted.F4q10.bam","/Volumes/BombXtreme/4617/4617_bam/4617-MB-6.hg19.32120.sorted.F4q10.bam","/Volumes/BombXtreme/4617/4617_bam/4617-MB-7.hg19.sorted.F4q10.bam","/Volumes/BombXtreme/4617/4617_bam/4617-MB-8.hg19.sorted.F4q10.bam"),
+                            Peaks = c("/Volumes/BombXtreme/4617/4617_macs2/4617_macs2_q0.001_keepdupall/4617-MB-5-BAMPE.q0.001.keepdupall_peaks.BLfiltered.narrowPeak","/Volumes/BombXtreme/4617/4617_macs2/4617_macs2_q0.001_keepdupall/4617-MB-6-BAMPE.q0.001.keepdupall_peaks.BLfiltered.narrowPeak","/Volumes/BombXtreme/4617/4617_macs2/4617_macs2_q0.001_keepdupall/4617-MB-7-BAMPE.q0.001.keepdupall_peaks.BLfiltered.narrowPeak","/Volumes/BombXtreme/4617/4617_macs2/4617_macs2_q0.001_keepdupall/4617-MB-8-BAMPE.q0.001.keepdupall_peaks.BLfiltered.narrowPeak"),
+                            PeakCaller="narrow")
+```
+
+## Look at overlapping peaks 
+
+# Overlapping peaks between replicates 
+```{r, results='hold', fig.show="hold"}
+mb1 <- dba(sampleSheet=CutandRunqv0.001)
+
+########overlap between replicates 
+
+dba.plotVenn(mb1,mb1$masks$"minusdT")
+
+dba.plotVenn(mb1,mb1$masks$"plusdT")
+
+```
+# Overlap between conditions
+```{r, results='hold', fig.show='hold'}
+
+###overlap between conditions 
+mb1 <- dba(sampleSheet=CutandRunqv0.001)
+
+  mb1 <- dba.peakset(mb1,c(1,2),sampID="minusdT",minOverlap=2)
+  mb1 <- dba.peakset(mb1,c(3,4),sampID="plusdT",minOverlap=2)
+  dba.plotVenn(mb1, mb1$masks$Consensus)  
+  
+```
+
+
+# Creating counts table
+
+```{r, results = 'hold', fig.show='hold'}
+
+mb2 <- dba(sampleSheet=CutandRunqv0.001)
+
+#PCA plot
+dba.plotPCA(mb2,DBA_CONDITION)
+
+#Remove hashtags to save as pdf below 
+#pdf("/Volumes/BombXtreme/4617/4617-Routput_Jan2021/010321_4617_PCA.pdf")
+#dba.plotPCA(mb2,DBA_CONDITION)
+#dev.off()
+
+#determine overlapping peaks between conditions 
+
+mb2_consensus <- dba.peakset(mb2, consensus=DBA_CONDITION, minOverlap=2)
+mb2_consensus <- dba(mb2_consensus,mask=mb2_consensus$masks$Consensus,minOverlap=1)
+
+consensus_peaks <- dba.peakset(mb2_consensus, bRetrieve=TRUE)
+
+mb2$config$singleEnd <- FALSE
+mb2_counts <- dba.count(mb2,score=DBA_SCORE_READS, peaks=consensus_peaks, bRemoveDuplicates=FALSE, bUseSummarizeOverlaps=TRUE) 
+mb2_dba = dba(mb2_counts,bSummarizedExperiment=TRUE)
+
+#retrieve proper peaks from counts data 
+m2_peakset <- dba.peakset(mb2_counts, bRetrieve=TRUE)
+glimpse(m2_peakset)
+
+write.table(cbind(data.frame(seqnames=seqnames(m2_peakset),starts=start(m2_peakset),ends=end(m2_peakset),strands=strand(m2_peakset)),assay(mb2_dba)),file="/Volumes/BombXtreme/4617/4617-Rouput_May2021/4617_countstable_SMARCA5CR_q0.001_keepdupall.txt",quote=F,sep="\t",row.names=F)
+
+```
+
+## Run DESEQ using total read counts as normalization 
+# use samtools 
+samtools flagstat *.bam 
+
+```{r, results='hold', fig.show='hold'}
+
+count <- read.table("/Volumes/BombXtreme/4617/4617-Rouput_May2021/4617_countstable_SMARCA5CR_q0.001_keepdupall.txt",sep="\t",header=TRUE)
+ 
+countData <- count[,c(5:8)]
+colData <- data.frame(condition=factor(c("minusdT","minusdT","plusdT","plusdT"),levels=c("minusdT","plusdT")),sample=c("minusdT_A","minusdT_B","plusdT_A","plusdT_B"))
+dds <- DESeqDataSetFromMatrix(countData = countData, colData = colData, design = ~ condition)
+
+#total counts 
+tc <- c(37319330,55662488,51072530,57170826)
+
+sizeFactors(dds) <- (tc/median(tc))
+
+#print out size factors
+sizeFactorsddsS5 <- sizeFactors(dds)
+sizeFactorsddsS5
+
+#dds <- DESeq(dds)
+dds <- estimateDispersions(dds)
+dds <- nbinomWaldTest(dds)
+ 
+##Create PCA plot of normalized data
+
+vsd<-varianceStabilizingTransformation(dds)
+z <- plotPCA(vsd, intgroup=c("condition"))
+nudge <- position_nudge(y = 1)
+z + geom_text(aes(label = vsd$sample), position = nudge, size=2)
+ 
+normdata <- counts(dds,normalized=TRUE)
+colnames(normdata)<-paste("norm",c("minusdT_A","minusdT_B","plusdT_A","plusdT_B"),sep="_")
+ 
+result_dTAG47_24hrvs0hr <- results(dds,contrast=c("condition","plusdT","minusdT"))
+result_dTAG47_24hrvs0hr_table <- cbind(count[,c(1:3)],countData,normdata,result_dTAG47_24hrvs0hr)
+glimpse(result_dTAG47_24hrvs0hr_table)
+
+#create a MA plot of differential changes 
+plotMA(result_dTAG47_24hrvs0hr, ylim=c(-7.5,5),main="SMARCA5 localization (+dTAG)",cex.lab=1.75, cex.axis=1.75 ,cex.main=1.75)
+pdf("/Volumes/BombXtreme/4617/4617-Rouput_May2021/4617_SMARCA5dTAG47_24hrvs0hr.q0.001.keepdup.normTC.MAplot.pdf")
+plotMA(result_dTAG47_24hrvs0hr, ylim=c(-7.5,5),main="SMARCA5 localization (+dTAG)",cex.lab=1.75, cex.axis=1.75 ,cex.main=1.75)
+dev.off()
+
+
+write.table(cbind(count[,c(1:3)],countData,normdata,result_dTAG47_24hrvs0hr),file="/Volumes/BombXtreme/4617/4617-Rouput_May2021/4617_resultSMARCA5q0.001.keepdup.normTC_Overnightvs0hr.txt",quote=F,row.names=F,sep="\t")
+## tables of the significantly changes genes
+result_dTAG47_24hrvs0hrtable <- read_tsv("/Volumes/BombXtreme/4617/4617-Rouput_May2021/4617_resultSMARCA5q0.001.keepdup.normTC_Overnightvs0hr.txt")
+result_dTAG47_24hrvs0hrtable
+
+result_dTAG47_24hrvs0hr.sigup <- result_dTAG47_24hrvs0hrtable %>%
+  filter(padj <= 0.05) %>%
+  mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
+  filter(FoldChange >= 1.5) %>%
+  filter(log2FoldChange > 0) %>% 
+  glimpse() 
+  
+result_dTAG47_24hrvs0hrtable  %>%
+  filter(pvalue <= 0.05) %>%
+  mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
+  filter(FoldChange >= 1.5) %>%
+  filter(log2FoldChange < 0) %>% 
+  glimpse() 
+
+result_dTAG47_24hrvs0hrtable  %>%
+  #filter(padj <= 0.05) %>%
+  mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
+  filter(FoldChange >= 2) %>%
+  filter(log2FoldChange < 0) %>% 
+  glimpse() 
+
+#%>% write_tsv("/Volumes/BombXtreme/4617/4617-Routput_Jan2021/010321_4617_resultSMARCA5q0.05_Overnightvs0hr.sigup.txt")
+
+result_dTAG47_24hrvs0hr.sigdn <- as.data.frame(result_dTAG47_24hrvs0hr_table) %>%
+  filter(padj <= 0.05) %>%
+  mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
+  filter(FoldChange >= 1.5) %>%
+  filter(log2FoldChange < 0) %>% 
+  glimpse() %>% 
+  write_tsv("/Volumes/BombXtreme/4617/4617-Rouput_May2021/4617_resultSMARCA5q0.001.keepdup.normTC_Overnightvs0hr.sigdn.txt") #%>%
+  #write_tsv("/Volumes/BombXtreme/4617/4617-Routput_Jan2021/021821_4617_resultSMARCA5q0.05.keepdup_Overnightvs0hr.normTC.sigdn.noheader.txt", col_names = FALSE)
+
+
+```
