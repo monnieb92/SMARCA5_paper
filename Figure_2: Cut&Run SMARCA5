@@ -165,22 +165,7 @@ result_dTAG47_24hrvs0hr.sigup <- result_dTAG47_24hrvs0hrtable %>%
   mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
   filter(FoldChange >= 1.5) %>%
   filter(log2FoldChange > 0) %>% 
-  glimpse() 
-  
-result_dTAG47_24hrvs0hrtable  %>%
-  filter(pvalue <= 0.05) %>%
-  mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
-  filter(FoldChange >= 1.5) %>%
-  filter(log2FoldChange < 0) %>% 
-  glimpse() 
-
-result_dTAG47_24hrvs0hrtable  %>%
-  #filter(padj <= 0.05) %>%
-  mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
-  filter(FoldChange >= 2) %>%
-  filter(log2FoldChange < 0) %>% 
-  glimpse() 
-
+  glimpse()   
 #%>% write_tsv("/Volumes/BombXtreme/4617/4617-Routput_Jan2021/010321_4617_resultSMARCA5q0.05_Overnightvs0hr.sigup.txt")
 
 result_dTAG47_24hrvs0hr.sigdn <- as.data.frame(result_dTAG47_24hrvs0hr_table) %>%
