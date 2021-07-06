@@ -86,7 +86,7 @@ ${BAM_DIR}/5872-MB-${i}.con.hg19.F4q10.sorted.alignsieve140-200.BLfiltered.bam \
 samtools index ${BAM_DIR}/5872-MB-${i}.con.hg19.F4q10.sorted.alignsieve140-200.BLfiltered.CTCF.bam
 ```
 
-#Deeptools 
+#Deeptools create normalized bigwig files with bam files containing isolated CTCF regions
 ```{conda}
 conda activate Deeptools_April2020
 
