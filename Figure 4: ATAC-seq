@@ -1,1 +1,190 @@
 
+
+##Cleaning and aligning ATAC-Seq Data
+
+```{bash}
+#Trimmomatic example
+java -classpath {SOFTWARE_DIR}/trimmomatic-0.32.jar org.usadellab.trimmomatic.TrimmomaticPE -phred33 3910-MB-3-TAAGGCGA-ACTGCATA_S36_R1_001.fastq.gz 3910-MB-3-TAAGGCGA-ACTGCATA_S36_R2_001.fastq.gz 3910-MB-3_R1_noadap.paired.txt 3910-MB-3_R1_noadap.unpaired.txt 3910-MB-3_R2_noadap.paired.txt 3910-MB-3_R2_noadap.unpaired.txt ILLUMINACLIP:atac_adaptor.txt:2:30:7 MINLEN:15
+
+
+#bowtie2 example 
+nohup bowtie2 -p 8 -X 2000 -q --no-mixed --no-discordant -x {GENOME_DIR}/hg19+dm3 -1 3910-MB-3_R1_noadap.paired.txt -2 3910-MB-3_R2_noadap.paired.txt -S 3910-MB-3.hg19dm.sam
+ 
+#Samtools
+samtools view -S -b -@ 10 3910-MB-3.hg19dm.sam > 3910-MB-3.hg19dm.bam
+
+samtools sort 3910-MB-3.hg19dm.bam 3910-MB-3.hg19dm.sorted
+
+samtools view -b -F 4 -q 10 3910-MB-3.hg19dm.sorted.bam > 3910-MB-3.hg19dm.sorted.F4q10.bam
+
+samtools view -bh 3910-MB-3.hg19dm.sorted.F4q10.bam chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX chrY > 3910-MB-3.hg19.sorted.F4q10.bam
+```
+
+```{Genrich}
+#Example of peak calling 
+samtools sort -@ 5 -n ../3910-MB-3.hg19.sorted.F4q10.bam -o 3910-MB-3.hg19.sorted.F4q10.sortn.bam
+
+Genrich -t ../3910-MB-3.hg19.sorted.F4q10.sortn.bam,../3910-MB-4.hg19.sorted.F4q10.sortn.bam -j -r -E {GENOME_DIR}/hg19_blacklist/hg19.blacklistpeaks.bed -q 0.05 -o 3910-3.4.withdup.j.r.Eblacklist.q0.05.narrowPeak
+```
+##Diffbind and DESeq2
+
+```{r}
+library(DiffBind)
+library(DESeq2)
+library(dplyr)
+library(readr)
+library(tidyverse)
+
+##Data Table
+ATAC_seq_narrowPeakq0.05.wdup <- data.frame(SampleID=c("minusdT-A","minusdT-B","plusdT2h-A","plusdT2h-B","plusdT6h-A","plusdT6h-B","plusdT24h-A","plusdT24h-B"),
+                                  Condition=c("minusdT","minusdT","plusdT2h","plusdT2h","plusdT6h","plusdT6h","plusdT24h","plusdT24h"),
+                                  Tissue = c("Kasumi", "Kasumi", "Kasumi", "Kasumi", "Kasumi", "Kasumi", "Kasumi", "Kasumi"), 
+                                 
+                                  Treatment =c("0","0","2dT","2dT", "6dT","6dT","24dT","24dT"),
+                                  Replicate = c("1","2","1","2","1","2","1","2"),
+                                  bamReads=c("/Volumes/MBomber_Ext/3910bam/3910-hg19-bam/3910-MB-3.hg19.sorted.F4q10.bam","/Volumes/MBomber_Ext/3910bam/3910-hg19-bam/3910-MB-4.hg19.sorted.F4q10.bam","/Volumes/MBomber_Ext/3910bam/3910-hg19-bam/3910-MB-5.hg19.sorted.F4q10.bam","/Volumes/MBomber_Ext/3910bam/3910-hg19-bam/3910-MB-6.hg19.sorted.F4q10.bam","/Volumes/MBomber_Ext/3910bam/3910-hg19-bam/3910-MB-7.hg19.sorted.F4q10.bam", "/Volumes/MBomber_Ext/3910bam/3910-hg19-bam/3910-MB-8.hg19.sorted.F4q10.bam","/Volumes/MBomber_Ext/3910bam/3910-hg19-bam/3910-MB-9.hg19.sorted.F4q10.bam","/Volumes/MBomber_Ext/3910bam/3910-hg19-bam/3910-MB-10.hg19.sorted.F4q10.bam"),
+                                                        Peaks=c("/Volumes/MBomber_Ext/3910bam/3910_bam_sortn/3910-Genrich/3910-3.4.withdup.j.r.Eblacklist.q0.05.narrowPeak","/Volumes/MBomber_Ext/3910bam/3910_bam_sortn/3910-Genrich/3910-3.4.withdup.j.r.Eblacklist.q0.05.narrowPeak","/Volumes/MBomber_Ext/3910bam/3910_bam_sortn/3910-Genrich/3910-5.6.withdup.j.r.Eblacklist.q0.05.narrowPeak","/Volumes/MBomber_Ext/3910bam/3910_bam_sortn/3910-Genrich/3910-5.6.withdup.j.r.Eblacklist.q0.05.narrowPeak","/Volumes/MBomber_Ext/3910bam/3910_bam_sortn/3910-Genrich/3910-7.8.withdup.j.r.Eblacklist.q0.05.narrowPeak","/Volumes/MBomber_Ext/3910bam/3910_bam_sortn/3910-Genrich/3910-7.8.withdup.j.r.Eblacklist.q0.05.narrowPeak","/Volumes/MBomber_Ext/3910bam/3910_bam_sortn/3910-Genrich/3910-9-10.withdup.j.r.Eblacklist.q0.05.narrowPeak","/Volumes/MBomber_Ext/3910bam/3910_bam_sortn/3910-Genrich/3910-9-10.withdup.j.r.Eblacklist.q0.05.narrowPeak"),PeakCaller="narrow")
+
+##Create Counts table 
+#Find the consensus peaks in each group, Peaks with at least two in each group
+mb2 <- dba(sampleSheet=ATAC_seq_narrowPeakq0.05.wdup)
+
+#PCA plot
+dba.plotPCA(mb2,DBA_CONDITION)
+pdf("/Volumes/BombXtreme/3910/3910_ATAC_R-ouput/pca-ATAC.q0.05.bamwdup.pdf")
+dba.plotPCA(mb2,DBA_CONDITION)
+dev.off()
+
+mb2_consensus <- dba.peakset(mb2, consensus=DBA_CONDITION, minOverlap=2)
+mb2_consensus <- dba(mb2_consensus,mask=mb2_consensus$masks$Consensus,minOverlap=1)
+
+
+consensus_peaks <- dba.peakset(mb2_consensus, bRetrieve=TRUE)
+consensus_peaks_df <- as.data.frame(consensus_peaks)
+
+mb2$config$singleEnd <- FALSE
+mb2_count <- dba.count(mb2,score=DBA_SCORE_READS, peaks=consensus_peaks, bRemoveDuplicates=FALSE, bUseSummarizeOverlaps=TRUE) 
+
+#peak data set from counts table
+m2_peakset <- dba.peakset(mb2_count, bRetrieve=TRUE)
+m2_peakset
+
+mb2 = dba(mb2_count,bSummarizedExperiment=TRUE)
+
+write.table(cbind(data.frame(seqnames=seqnames(m2_peakset),starts=start(m2_peakset),ends=end(m2_peakset),strands=strand(m2_peakset)),assay(mb2)),file="/Volumes/BombXtreme/3910/3910_ATAC_R-ouput/counttable_raw-ATAC_q0.05.bamwdup-removedBLwithDiffbind.txt",quote=F,sep="\t",row.names=F)
+
+
+#DESeq2 with S2 normalization factors
+count <- read.table("/Volumes/BombXtreme/3910/3910_ATAC_R-ouput/counttable_raw-ATAC_q0.05.bamwdup-removedBLwithDiffbind.txt",sep="\t",header=TRUE)
+ 
+countData <- count[,c(5:12)]
+colData <- data.frame(condition=factor(c("minusdT","minusdT","plusdT2h","plusdT2h","plusdT6h","plusdT6h","plusdT24h","plusdT24h"),levels=c("minusdT","plusdT2h","plusdT6h","plusdT24h")),sample=c("minusdT-A","minusdT-B","plusdT2h-A","plusdT2h-B","plusdT6h-A","plusdT6h-B","plusdT24h-A","plusdT24h-B"))
+dds <- DESeqDataSetFromMatrix(countData = countData, colData = colData, design = ~ condition)
+
+#input the S2 normalization factors after using .dm3.bam files using samtools flagstat 
+sf <- c(0.889,1.204,0.974,1.025,1.28,0.862,0.76,0.82)
+sizeFactors(dds) <- sf
+ 
+#print out normalization factors determined by DESeq2
+sizeFactorsddsATAC <- sizeFactors(dds)
+sizeFactorsddsATAC
+
+#dds <- DESeq(dds)
+dds <- estimateDispersions(dds)
+dds <- nbinomWaldTest(dds)
+ 
+ 
+vsd<-varianceStabilizingTransformation(dds)
+z <- plotPCA(vsd, intgroup=c("condition"))
+nudge <- position_nudge(y = 1)
+z + geom_text(aes(label = vsd$sample), position = nudge, size=2)
+ 
+normdata <- counts(dds,normalized=TRUE)
+colnames(normdata)<-paste("norm",c("minusdT-A","minusdT-B","plusdT2h-A","plusdT2h-B","plusdT6h-A","plusdT6h-B","plusdT24h-A","plusdT24h-B"),sep="_")
+ 
+result_dTAG47_2hrvs0hr <- results(dds,contrast=c("condition","plusdT2h","minusdT"))
+result_dTAG47_6hrvs0hr <- results(dds,contrast=c("condition","plusdT6h","minusdT"))
+result_dTAG47_24hrvs0hr <- results(dds,contrast=c("condition","plusdT24h","minusdT"))
+
+#create a MA plot of differential changes 
+plotMA(result_dTAG47_2hrvs0hr, ylim=c(-7,5),main="ATAC 2h (+dTAG)",cex.lab=1.75, cex.axis=1.75 ,cex.main=1.75)
+pdf("/Volumes/BombXtreme/3910/3910_ATAC_R-ouput/resultATACq0.05.bamwdup-BLfiltered_SMARCA5dTAG47_2hrvs0hr.MAplot.pdf")
+plotMA(result_dTAG47_2hrvs0hr, ylim=c(-7,5),main="ATAC 2h (+dTAG)",cex.lab=1.75, cex.axis=1.75 ,cex.main=1.75)
+dev.off()
+
+plotMA(result_dTAG47_6hrvs0hr, ylim=c(-7.5,5),main="ATAC 6h (+dTAG)",cex.lab=1.75, cex.axis=1.75 ,cex.main=1.75)
+pdf("//Volumes/BombXtreme/3910/3910_ATAC_R-ouput/resultATACq0.05.bamwdup-BLfiltered_SMARCA5dTAG47_6hrvs0hr.MAplot.pdf")
+plotMA(result_dTAG47_6hrvs0hr, ylim=c(-7.5,5),main="ATAC 6h (+dTAG)",cex.lab=1.75, cex.axis=1.75 ,cex.main=1.75)
+dev.off()
+
+plotMA(result_dTAG47_24hrvs0hr, ylim=c(-7.5,5),main="ATAC 24h (+dTAG)n",cex.lab=1.75, cex.axis=1.75 ,cex.main=1.75)
+pdf("/Volumes/BombXtreme/3910/3910_ATAC_R-ouput/resultATACq0.05.bamwdup-BLfiltered_SMARCA5dTAG47_24hrvs0hr.MAplot.pdf")
+plotMA(result_dTAG47_24hrvs0hr, ylim=c(-7.5,5),main="ATAC 24h (+dTAG)",cex.lab=1.75, cex.axis=1.75 ,cex.main=1.75)
+dev.off()
+
+#2hour differential peaks
+write.table(cbind(count[,c(1:3)],countData,normdata,result_dTAG47_2hrvs0hr),file="/Volumes/BombXtreme/3910/3910_ATAC_R-ouput/resultATACq0.05.bamwdup-BLfiltered_SMARCA5dTAG47_2hrvs0hr.txt",quote=F,row.names=F,sep="\t")
+## tables of the significantly changes genes
+result_dTAG47_2hrvs0hrtable <- read_tsv("/Volumes/BombXtreme/3910/3910_ATAC_R-ouput/resultATACq0.05.bamwdup-BLfiltered_SMARCA5dTAG47_2hrvs0hr.txt")
+
+result_dTAG47_2hrvs0hrtable.sigup <- result_dTAG47_2hrvs0hrtable %>%
+  filter(padj <= 0.05) %>%
+  mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
+  filter(FoldChange >= 1.5) %>%
+  filter(log2FoldChange > 0) %>% 
+  glimpse() %>%
+  write_tsv("/Volumes/BombXtreme/3910/3910_ATAC_R-ouput/resultATAq0.05.bamwdup-BLfiltered_SMARCA5dTAG47_2hrvs0hr.sigup.txt")
+
+result_dTAG47_2hrvs0hrtable.sigdn <- result_dTAG47_2hrvs0hrtable %>%
+  filter(padj <= 0.05) %>%
+  mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
+  filter(FoldChange >= 1.5) %>%
+  filter(log2FoldChange < 0) %>% 
+  glimpse() %>%
+  write_tsv("/Volumes/BombXtreme/3910/3910_ATAC_R-ouput/resultATACq0.05.bamwdup-BLfiltered_SMARCA5dTAG47_2hrvs0hr.sigdn.txt")
+
+
+#6 hour differential peaks 
+write.table(cbind(count[,c(1:3)],countData,normdata,result_dTAG47_6hrvs0hr),file="/Volumes/BombXtreme/3910/3910_ATAC_R-ouput/resultATACq0.05.bamwdup-BLfiltered_SMARCA5dTAG47_6hrvs0hr.txt",quote=F,row.names=F,sep="\t")
+## tables of the significantly changes genes
+result_dTAG47_6hrvs0hrtable <- read_tsv("/Volumes/BombXtreme/3910/3910_ATAC_R-ouput/resultATACq0.05.bamwdup-BLfiltered_SMARCA5dTAG47_6hrvs0hr.txt")
+
+result_dTAG47_6hrvs0hrtable.sigup <- result_dTAG47_6hrvs0hrtable %>%
+  filter(padj <= 0.05) %>%
+  mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
+  filter(FoldChange >= 1.5) %>%
+  filter(log2FoldChange > 0) %>% 
+  glimpse() %>%
+  write_tsv("/Volumes/BombXtreme/3910/3910_ATAC_R-ouput/resultATACq0.05.bamwdup-BLfiltered_SMARCA5dTAG47_6hrvs0hr.sigup.txt")
+
+result_dTAG47_6hrvs0hrtable.sigdn <- result_dTAG47_6hrvs0hrtable %>%
+  filter(padj <= 0.05) %>%
+  mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
+  filter(FoldChange >= 1.5) %>%
+  filter(log2FoldChange < 0) %>% 
+  glimpse() %>%
+  write_tsv("/Volumes/BombXtreme/3910/3910_ATAC_R-ouput/resultATACq0.05.bamwdup-BLfiltered_SMARCA5dTAG47_6hrvs0hr.sigdn.txt")
+
+
+#24hour differential peaks
+write.table(cbind(count[,c(1:3)],countData,normdata,result_dTAG47_24hrvs0hr),file="/Volumes/BombXtreme/3910/3910_ATAC_R-ouput/resultATACq0.05.bamwdup-BLfiltered_SMARCA5dTAG47_24hrvs0hr.txt",quote=F,row.names=F,sep="\t")
+
+## tables of the significantly changes genes
+result_dTAG47_24hrvs0hrtable <- read_tsv("/Volumes/BombXtreme/3910/3910_ATAC_R-ouput/resultATACq0.05.bamwdup-BLfiltered_SMARCA5dTAG47_24hrvs0hr.txt")
+
+result_dTAG47_24hrvs0hr.sigup <- result_dTAG47_24hrvs0hrtable %>%
+  filter(padj <= 0.05) %>%
+  mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
+  filter(FoldChange >= 1.5) %>%
+  filter(log2FoldChange > 0) %>% 
+  glimpse() %>%
+  write_tsv("/Volumes/BombXtreme/3910/3910_ATAC_R-ouput/resultATACq0.05.bamwdup-BLfiltered_SMARCA5dTAG47_24hrvs0hr.sigup.txt")
+
+result_dTAG47_24hrvs0hr.sigdn <- result_dTAG47_24hrvs0hrtable %>%
+  filter(padj <= 0.05) %>%
+  mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
+  filter(FoldChange >= 1.5) %>%
+  filter(log2FoldChange < 0) %>% 
+  glimpse() %>%
+  write_tsv("/Volumes/BombXtreme/3910/3910_ATAC_R-ouput/resultATACq0.05.bamwdup-BLfiltered_SMARCA5dTAG47_24hrvs0hr.sigdn.txt")
+```
