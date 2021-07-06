@@ -1,1 +1,189 @@
+##CTCF CUT&RUN cleaning and aligning
+```{bash}
+#Trimmomatic example
+java -classpath {SOFTWARE_DIR}/trimmomatic-0.32.jar org.usadellab.trimmomatic.TrimmomaticPE -phred33 \
+5176-MB-1-TCGGATTC-CGCAACTA_S01_L005_R1_001.fastq.gz 5176-MB-1-TCGGATTC-CGCAACTA_S01_L005_R2_001.fastq.gz \
+5176-MB-1_R1.nodap.paired.txt 5176-MB-1_R1.noadap.unpaired.txt 5176-MB-1_R2.noadap.paired.txt  5176-MB-1_R2.noadap.unpaired.txt \
+ILLUMINACLIP:TruSeq_CD_adapter.txt:2:30:7 LEADING:15 TRAILING:15 MINLEN:15 
 
+#Bowtie2 example
+bowtie2 -p 8 --local --very-sensitive-local --no-unal --no-mixed --no-discordant --phred33 -I 10 -X 700 -x {GENOME_DIR}/hg19_scer_genomes/Bowtie2Index/hg19_sc -1 5176-MB-1_R1.noadap.paired.txt -2 5176-MB-1_R2.noadap.paired.txt \
+-S 5176-MB-1.hg19scer.sam
+
+#samtools example
+
+samtools view -S -b -@ 10  5176-MB-1.hg19scer.sam >  5176-MB-1.hg19scer.bam
+
+samtools sort  5176-MB-1.hg19scer.bam  5176-MB-1.hg19scer.sorted
+
+samtools view -b -F 4 -q 10 5176-MB-1.hg19scer.sorted.bam > 5176-MB-1.hg19scer.sorted.F4q10.bam
+
+samtools view -bh 5176-MB-1.hg19scer.sorted.F4q10.bam chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 \
+chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX chrY chrM > 5176-MB-1.hg19.sorted.F4q10.bam
+
+samtools index 5176-MB-1.hg19.sorted.F4q10.bam
+
+```
+##Diffbind AND DESeq2 of CTCF CUT&RUN
+```{r}
+#packages used
+library("DiffBind")
+packageVersion("DiffBind")
+
+library("DESeq2")
+packageVersion("DESeq2")
+
+library(tidyr)
+library(tidyverse)
+library(readr)
+library(dplyr)
+
+#Dataframe of location of bam files and peak files
+CTCF_allnarrowpeaksq0.05 <- data.frame(SampleID=c("minusdT-A","minusdT-B","plusdT2h-A","plusdT2h-B","plusdT6h-A","plusdT6h-B","plusdT24h-A","plusdT24h-B"),
+                                  Condition=c("minusdT","minusdT","plusdT2h","plusdT2h","plusdT6h","plusdT6h","plusdT24h","plusdT24h"),
+                                  Tissue = c("Kasumi", "Kasumi", "Kasumi", "Kasumi", "Kasumi", "Kasumi", "Kasumi", "Kasumi"), 
+                                  Factor = c("CTCF", "CTCF", "CTCF", "CTCF", "CTCF", "CTCF", "CTCF", "CTCF"), 
+                                  Treatment =c("0","0","2dT","2dT", "6dT","6dT","24dT","24dT"),
+                                  Replicate = c("1","2","1","2","1","2","1","2"),
+                                  bamReads=c("/Volumes/BombXtreme/5176_CutRun_CTCF/5176_bam/5176-MB-1.hg19.F4q10.sorted.bam","/Volumes/BombXtreme/5176_CutRun_CTCF/5176_bam/5176-MB-2.hg19.F4q10.sorted.bam","/Volumes/BombXtreme/5176_CutRun_CTCF/5176_bam/5176-MB-3.hg19.F4q10.sorted.bam","/Volumes/BombXtreme/5176_CutRun_CTCF/5176_bam/5176-MB-4.hg19.F4q10.sorted.bam","/Volumes/BombXtreme/5176_CutRun_CTCF/5176_bam/5176-MB-5.hg19.F4q10.sorted.bam","/Volumes/BombXtreme/5176_CutRun_CTCF/5176_bam/5176-MB-6.hg19.F4q10.sorted.bam", "/Volumes/BombXtreme/5176_CutRun_CTCF/5176_bam/5176-MB-7.hg19.F4q10.sorted.bam","/Volumes/BombXtreme/5176_CutRun_CTCF/5176_bam/5176-MB-8.hg19.F4q10.sorted.bam"),
+                                  Peaks=c("/Volumes/BombXtreme/5176_CutRun_CTCF/5176_macs/5176_macs_q0.05.keepdup/5176-MB-1.BAMPE.q0.05.keepdupall_peaks.BLfiltered.narrowPeak","/Volumes/BombXtreme/5176_CutRun_CTCF/5176_macs/5176_macs_q0.05.keepdup/5176-MB-2.BAMPE.q0.05.keepdupall_peaks.BLfiltered.narrowPeak","/Volumes/BombXtreme/5176_CutRun_CTCF/5176_macs/5176_macs_q0.05.keepdup/5176-MB-3.BAMPE.q0.05.keepdupall_peaks.BLfiltered.narrowPeak","/Volumes/BombXtreme/5176_CutRun_CTCF/5176_macs/5176_macs_q0.05.keepdup/5176-MB-4.BAMPE.q0.05.keepdupall_peaks.BLfiltered.narrowPeak","/Volumes/BombXtreme/5176_CutRun_CTCF/5176_macs/5176_macs_q0.05.keepdup/5176-MB-5.BAMPE.q0.05.keepdupall_peaks.BLfiltered.narrowPeak","/Volumes/BombXtreme/5176_CutRun_CTCF/5176_macs/5176_macs_q0.05.keepdup/5176-MB-6.BAMPE.q0.05.keepdupall_peaks.BLfiltered.narrowPeak","/Volumes/BombXtreme/5176_CutRun_CTCF/5176_macs/5176_macs_q0.05.keepdup/5176-MB-7.BAMPE.q0.05.keepdupall_peaks.BLfiltered.narrowPeak","/Volumes/BombXtreme/5176_CutRun_CTCF/5176_macs/5176_macs_q0.05.keepdup/5176-MB-8.BAMPE.q0.05.keepdupall_peaks.BLfiltered.narrowPeak"),PeakCaller="narrow")
+#Find the consensus peaks in each group, Peaks with at least two in each group
+mb2 <- dba(sampleSheet=CTCF_allnarrowpeaksq0.05)
+
+#PCA plot
+
+dba.plotPCA(mb2,DBA_CONDITION)
+pdf("{OUTPUT_DIR}/5176_CTCF_R-ouput/pca-CTCF.q0.05.pdf")
+dba.plotPCA(mb2,DBA_CONDITION)
+dev.off()
+#DIFFBIND COUNTS TABLE OF CONCENSUS PEAKS 
+mb2_consensus <- dba.peakset(mb2, consensus=DBA_CONDITION, minOverlap=2)
+mb2_consensus <- dba(mb2_consensus,mask=mb2_consensus$masks$Consensus,minOverlap=1)
+
+
+consensus_peaks <- dba.peakset(mb2_consensus, bRetrieve=TRUE)
+consensus_peaks_df <- as.data.frame(consensus_peaks)
+
+mb2$config$singleEnd <- FALSE
+mb2_count <- dba.count(mb2,score=DBA_SCORE_READS, peaks=consensus_peaks, bRemoveDuplicates=FALSE, bUseSummarizeOverlaps=TRUE) 
+
+#peak data set from counts table
+m2_peakset <- dba.peakset(mb2_count, bRetrieve=TRUE)
+m2_peakset
+
+mb2 = dba(mb2_count,bSummarizedExperiment=TRUE)
+
+write.table(cbind(data.frame(seqnames=seqnames(m2_peakset),starts=start(m2_peakset),ends=end(m2_peakset),strands=strand(m2_peakset)),assay(mb2)),file="{OUTPUT_DIR}/5176_CTCF_R-ouput/counttable_raw-CTCF-q0.05-removedBLwithDiffbind.txt",quote=F,sep="\t",row.names=F)
+
+count <- read.table("{OUTPUT_DIR}/5176_CTCF_R-ouput/counttable_raw-CTCF-q0.05-removedBLwithDiffbind.txt",sep="\t",header=TRUE)
+ 
+countData <- count[,c(5:12)]
+colData <- data.frame(condition=factor(c("minusdT","minusdT","plusdT2h","plusdT2h","plusdT6h","plusdT6h","plusdT24h","plusdT24h"),levels=c("minusdT","plusdT2h","plusdT6h","plusdT24h")),sample=c("minusdT-A","minusdT-B","plusdT2h-A","plusdT2h-B","plusdT6h-A","plusdT6h-B","plusdT24h-A","plusdT24h-B"))
+dds <- DESeqDataSetFromMatrix(countData = countData, colData = colData, design = ~ condition)
+
+#input the total counts from the *.hg19.sorted.F4q10.bam files using samtools flagstat 
+tc <- c(8552243,12556112,8580875,10326034,10192048,10168794,9196896,10721486)
+sizeFactors(dds) <- (tc/median(tc))
+ 
+#print out normalization factors determined by DESeq2
+sizeFactorsddsCTCF <- sizeFactors(dds)
+sizeFactorsddsCTCF
+
+#dds <- DESeq(dds)
+dds <- estimateDispersions(dds)
+dds <- nbinomWaldTest(dds)
+ 
+ 
+vsd<-varianceStabilizingTransformation(dds)
+z <- plotPCA(vsd, intgroup=c("condition"))
+nudge <- position_nudge(y = 1)
+z + geom_text(aes(label = vsd$sample), position = nudge, size=2)
+ 
+normdata <- counts(dds,normalized=TRUE)
+colnames(normdata)<-paste("norm",c("minusdT-A","minusdT-B","plusdT2h-A","plusdT2h-B","plusdT6h-A","plusdT6h-B","plusdT24h-A","plusdT24h-B"),sep="_")
+ 
+result_dTAG47_2hrvs0hr <- results(dds,contrast=c("condition","plusdT2h","minusdT"))
+result_dTAG47_6hrvs0hr <- results(dds,contrast=c("condition","plusdT6h","minusdT"))
+result_dTAG47_24hrvs0hr <- results(dds,contrast=c("condition","plusdT24h","minusdT"))
+
+#create a MA plot of differential changes 
+plotMA(result_dTAG47_2hrvs0hr, ylim=c(-7,5),main="CTCF localization 2h (+dTAG)",cex.lab=1.75, cex.axis=1.75 ,cex.main=1.75)
+pdf("/Volumes/BombXtreme/5176_CutRun_CTCF/5176_CTCF_R-ouput/resultCTCFBLfiltered_SMARCA5dTAG47_2hrvs0hr.q0.05.MAplot.pdf")
+plotMA(result_dTAG47_2hrvs0hr, ylim=c(-7,5),main="CTCF localization 2h (+dTAG)",cex.lab=1.75, cex.axis=1.75 ,cex.main=1.75)
+dev.off()
+
+plotMA(result_dTAG47_6hrvs0hr, ylim=c(-7.5,5),main="CTCF localization 6h (+dTAG)",cex.lab=1.75, cex.axis=1.75 ,cex.main=1.75)
+pdf("/Volumes/BombXtreme/5176_CutRun_CTCF/5176_CTCF_R-ouput/resultCTCFBLfiltered_SMARCA5dTAG47_6hrvs0hr.q0.05.MAplot.pdf")
+plotMA(result_dTAG47_6hrvs0hr, ylim=c(-7.5,5),main="CTCF localization 6h (+dTAG)",cex.lab=1.75, cex.axis=1.75 ,cex.main=1.75)
+dev.off()
+
+plotMA(result_dTAG47_24hrvs0hr, ylim=c(-7.5,5),main="CTCF localization 24h (+dTAG)n",cex.lab=1.75, cex.axis=1.75 ,cex.main=1.75)
+pdf("/Volumes/BombXtreme/5176_CutRun_CTCF/5176_CTCF_R-ouput/resultCTCFBLfiltered_SMARCA5dTAG47_24hrvs0hr.q0.05.MAplot.pdf")
+plotMA(result_dTAG47_24hrvs0hr, ylim=c(-7.5,5),main="CTCF localization 24h (+dTAG)",cex.lab=1.75, cex.axis=1.75 ,cex.main=1.75)
+dev.off()
+
+#2hour differential peaks
+write.table(cbind(count[,c(1:3)],countData,normdata,result_dTAG47_2hrvs0hr),file="/Volumes/BombXtreme/5176_CutRun_CTCF/5176_CTCF_R-ouput/resultCTCFq0.05BLfiltered_SMARCA5dTAG47_2hrvs0hr.txt",quote=F,row.names=F,sep="\t")
+## tables of the significantly changes genes
+result_dTAG47_2hrvs0hrtable <- read_tsv("/Volumes/BombXtreme/5176_CutRun_CTCF/5176_CTCF_R-ouput/resultCTCFq0.05BLfiltered_SMARCA5dTAG47_2hrvs0hr.txt")
+
+result_dTAG47_2hrvs0hrtable.sigup <- result_dTAG47_2hrvs0hrtable %>%
+  filter(padj <= 0.05) %>%
+  mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
+  filter(FoldChange >= 1.5) %>%
+  filter(log2FoldChange > 0) %>% 
+  glimpse() %>%
+  write_tsv("/Volumes/BombXtreme/5176_CutRun_CTCF/5176_CTCF_R-ouput/resultCTCFq0.05BLfiltered_SMARCA5dTAG47_2hrvs0hr.sigup.txt")
+
+result_dTAG47_2hrvs0hrtable.sigdn <- result_dTAG47_2hrvs0hrtable %>%
+  filter(padj <= 0.05) %>%
+  mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
+  filter(FoldChange >= 1.5) %>%
+  filter(log2FoldChange < 0) %>% 
+  glimpse() %>%
+  write_tsv("/Volumes/BombXtreme/5176_CutRun_CTCF/5176_CTCF_R-ouput/resultCTCFq0.05BLfiltered_SMARCA5dTAG47_2hrvs0hr.sigdn.txt")
+
+
+#6 hour differential peaks 
+write.table(cbind(count[,c(1:3)],countData,normdata,result_dTAG47_6hrvs0hr),file="/Volumes/BombXtreme/5176_CutRun_CTCF/5176_CTCF_R-ouput/resultCTCFq0.05BLfiltered_SMARCA5dTAG47_6hrvs0hr.txt",quote=F,row.names=F,sep="\t")
+## tables of the significantly changes genes
+result_dTAG47_6hrvs0hrtable <- read_tsv("/Volumes/BombXtreme/5176_CutRun_CTCF/5176_CTCF_R-ouput/resultCTCFq0.05BLfiltered_SMARCA5dTAG47_6hrvs0hr.txt")
+
+result_dTAG47_6hrvs0hrtable.sigup <- result_dTAG47_6hrvs0hrtable %>%
+  filter(padj <= 0.05) %>%
+  mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
+  filter(FoldChange >= 1.5) %>%
+  filter(log2FoldChange > 0) %>% 
+  glimpse() %>%
+  write_tsv("/Volumes/BombXtreme/5176_CutRun_CTCF/5176_CTCF_R-ouput/resultCTCFq0.05BLfiltered_SMARCA5dTAG47_6hrvs0hr.sigup.txt")
+
+result_dTAG47_6hrvs0hrtable.sigdn <- result_dTAG47_6hrvs0hrtable %>%
+  filter(padj <= 0.05) %>%
+  mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
+  filter(FoldChange >= 1.5) %>%
+  filter(log2FoldChange < 0) %>% 
+  glimpse() %>%
+  write_tsv("/Volumes/BombXtreme/5176_CutRun_CTCF/5176_CTCF_R-ouput/resultCTCFq0.05BLfiltered_SMARCA5dTAG47_6hrvs0hr.sigdn.txt")
+
+
+#24hour differential peaks
+write.table(cbind(count[,c(1:3)],countData,normdata,result_dTAG47_24hrvs0hr),file="/Volumes/BombXtreme/5176_CutRun_CTCF/5176_CTCF_R-ouput/resultCTCFq0.05BLfiltered_SMARCA5dTAG47_24hrvs0hr.txt",quote=F,row.names=F,sep="\t")
+## tables of the significantly changes genes
+result_dTAG47_24hrvs0hrtable <- read_tsv("/Volumes/BombXtreme/5176_CutRun_CTCF/5176_CTCF_R-ouput/resultCTCFq0.05BLfiltered_SMARCA5dTAG47_24hrvs0hr.txt")
+
+result_dTAG47_24hrvs0hr.sigup <- result_dTAG47_24hrvs0hrtable %>%
+  filter(padj <= 0.05) %>%
+  mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
+  filter(FoldChange >= 1.5) %>%
+  filter(log2FoldChange > 0) %>% 
+  glimpse() %>%
+  write_tsv("/Volumes/BombXtreme/5176_CutRun_CTCF/5176_CTCF_R-ouput/resultCTCFq0.05BLfiltered_SMARCA5dTAG47_24hrvs0hr.sigup.txt")
+
+result_dTAG47_24hrvs0hr.sigdn <- result_dTAG47_24hrvs0hrtable %>%
+  filter(padj <= 0.05) %>%
+  mutate(FoldChange = (2^(abs(log2FoldChange)))) %>%
+  filter(FoldChange >= 1.5) %>%
+  filter(log2FoldChange < 0) %>% 
+  glimpse() %>%
+  write_tsv("/Volumes/BombXtreme/5176_CutRun_CTCF/5176_CTCF_R-ouput/resultCTCFq0.05BLfiltered_SMARCA5dTAG47_24hrvs0hr.sigdn.txt")
+```
