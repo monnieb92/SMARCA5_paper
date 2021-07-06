@@ -1,1 +1,223 @@
 
+###Figure7A-B
+##NRL ATAC-Seq
+##modified code from the original--- Inference of nucleosome repeat length (nucleosome + one linker) from ATAC-seq data
+## modified code from the original---as applied in Barisic D, Stadler MB, Iurlaro M, Schübeler D. Nature 2019 May;569(7754):136-140. PMID: 30996347
+## modified code from the original--- Author: Michael Stadler (michael.stadler@fmi.ch), December 11, 2017
+
+```{r}
+library(Rsamtools) # reading of bam files
+library(readr)
+library(GenomicRanges)
+library(AnnotationDbi)
+library(dplyr)
+library(BSgenome.Hsapiens.UCSC.hg19) #reference genome
+
+## read insert size from bam file (autosomes only)
+## ... get autosomal regions
+##     Remark: all alignments in the genomic regions defined in chrs will be included in the analysis.
+##             You can exclude further regions (e.g. promoter, enhancers, ...) by further restricting
+##             this GRanges object (see also ?setdiff,GenomicRanges,GenomicRanges-method)
+#using the whole genome 
+glimpse(BSgenome.Hsapiens.UCSC.hg19)
+chrs <- tileGenome(seqlengths = seqlengths(BSgenome.Hsapiens.UCSC.hg19)[1:22],
+                   tilewidth = max(seqlengths(BSgenome.Hsapiens.UCSC.hg19)),
+                   cut.last.tile.in.chrom = TRUE)
+names(chrs) <- rep("genome",length(chrs))
+glimpse(chrs)
+
+#bam files umerged:
+T0hA_bam <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-MB-3.hg19.sorted.F4q10.bam"
+T0hB_bam <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-MB-4.hg19.sorted.F4q10.bam"
+T2hA_bam <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-MB-5.hg19.sorted.F4q10.bam"
+T2hB_bam <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-MB-6.hg19.sorted.F4q10.bam"
+T6hA_bam <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-MB-7.hg19.sorted.F4q10.bam"
+T6hB_bam <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-MB-8.hg19.sorted.F4q10.bam"
+T24hA_bam <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-MB-9.hg19.sorted.F4q10.bam"
+T24hB_bam <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-MB-10.hg19.sorted.F4q10.bam"
+
+#Add bam files-merged
+T0hbamfile <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-hg19-mergedbam/3910-MB-3-4.hg19.sorted.F4q10.bam"
+T2hbamfile <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-hg19-mergedbam/3910-MB-5-6.hg19.sorted.F4q10.bam"
+T6hbamfile <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-hg19-mergedbam/3910-MB-7-8.hg19.sorted.F4q10.bam"
+T24hbamfile <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-hg19-mergedbam/3910-MB-9-10.hg19.sorted.F4q10.bam"
+## ... loess fit smoothing parameter 1
+##     a first loess fit with this parameter will be fit to the fragment length distribution
+##     in log space, in order to capture the (low-frequency) decrease of fragment frequencies
+##     with increasing length
+lspan <- 0.35
+
+## ... loess fit smoothing parameter 2
+##     a second loess fit with this parameter will be fit to the residuals of the first fit
+##     in order to obtain a smooth curve from which the nucleosome fragment lengths will be obtained
+rspan <- 0.1
+
+##     Remark: if the fragment length distribution differs from the one in the published
+##     ATAC data, the lspan and rspan parameters may have to be adjusted
+
+## ... minimal fragment length included in loess fit
+##     (shorter fragments are mostly originating from transcription factors and will not be
+##      informative for the nucleosomal fragment length estimation)
+minxFit <- 51
+
+###EXAMPLE OF CALCULATED NRL using previously published loess model 
+## ... define parameters to read fragment size (isize)
+##     only from first reads (R1, to avoid redundancy)
+##     of uniquely mapped proper pairs (mapq >= 11L)
+##     to autosomes (chrs)
+
+
+params <- ScanBamParam(flag=scanBamFlag(isPaired=TRUE, isProperPair=TRUE,
+                                        isUnmappedQuery=FALSE, hasUnmappedMate=FALSE,
+                                        isFirstMateRead=TRUE),
+                       which=chrs, what="isize", mapqFilter=11L)
+## ... read fragment sizes from bamfile
+##     Remark: insert sizes can be positive or negative depending on the alignment pair orientation
+isize <- unlist(lapply(scanBam(file = T0hA_bam, param = params), "[[", "isize"), use.names=FALSE)
+str(isize)
+## ... tabulate absolute insert sizes
+##     mx is the maximum observed fragment length
+##     cnt[i] is the number of fragments of length i
+##     freq[i] is the fraction of fragments of length i
+mx <- max(abs(isize))
+cnt <- tabulate(abs(isize))
+freq <- cnt / sum(cnt)
+
+
+## calculate possible length ranges for mono-/di-/tri-nucleotide fragments,
+## for given nucleosome length and minimum/maximum linker lengths
+calcNuclFragLen <- function(nNucl, nuclLen = 147, linkLenMin = 10, linkLenMax = 80)
+    nNucl*nuclLen + nNucl*c(linkLenMin, linkLenMax)
+
+nuclBinsL <- list(mono = calcNuclFragLen(1),
+                  di   = calcNuclFragLen(2),
+                  tri  = calcNuclFragLen(3))
+nuclBinsL
+
+
+## look at the distribution of insert sizes:
+## - a ~10bp periodicity corresponding to the DNA helical turn
+##   is typically visible in sub-nucleosomal fragments
+## - mono-, di- and ideally also tri-nucleosomal fragments should
+##   be visible as peaks in the respective ranges
+## - all samples to be compared in the analysis should have similar
+##   fragment length distributions
+## pdf("plots/20b_fragment_length_distribution.pdf", height = 6, width = 7, pointsize = 16)
+par(mar = c(5, 4, 4-3, 2) + 0.1)
+plot(seq_along(freq), freq, type = "n",
+     xlab = "Fragment size (bp)", ylab = "Frequency")
+rect(xleft = sapply(nuclBinsL, .subset, 1), ybottom = par("usr")[3],
+     xright = sapply(nuclBinsL, .subset, 2), ytop = par("usr")[4],
+     col = c("#8DD3C733", "#BEBADA33", "#FB807233"), border = NA)
+lines(seq_along(freq), freq, lty = 1, col = "#E41A1C")
+## dev.off()
+
+
+## create and visualize loess fits, and estimate fragment lengths and NRL
+##   xs: fragment length
+##   keep: data to include in fit 1
+##   fit1: first loess fit (log space)
+##   pfreq: predicted frequency
+##   rfreq: residuals
+##   fit2: second leoss fit (residuals)
+##   avgFragLength: average length of mono-, di- and tri-nucleosomal fragments
+##   estNRL: estimated nucleosome repeat length combinding estimates
+##           of mono-, di- and tri-nucleosomal fragment lengths
+xs <- 1:mx
+keep <- freq > 0 & xs >= minxFit
+fit1 <- loess(log(freq) ~ log(xs), subset = keep, span = lspan, surface="direct")
+pfreq <- exp(predict(fit1, log(xs)))
+rfreq <- freq - pfreq
+
+fit2 <- loess(rfreq ~ xs, subset = keep, span = rspan)
+avgFragLength <- sapply(nuclBinsL, function(xr) {
+    xrs <- seq.int(xr[1], xr[2])
+    xrs[which.max(predict(fit2, xrs))]
+})
+avgFragLength
+
+estNRL <- mean(avgFragLength / seq_along(avgFragLength))
+estNRL
+
+pdf("/Volumes/BombXtreme/3910/3910_NRL/3910_chrs_dup/T0hAwdup_GRanges_chrs_plusminus1kb.20b_loess_fit0.35.0.1.pdf", height = 6, width = 14, pointsize = 16)
+par(mfrow = c(1, 2), mar = c(5, 4, 4 - 3, 2) + 0.1)
+## ... original data
+plot(xs[keep], freq[keep], type = "n",
+     xlab = "Fragment size (bp)", ylab = "Frequency", log="xy",
+     xlim = c(minxFit, mx) + c(-10, 10),
+     ylim = c(0.00001,0.01000))
+rect(xleft = sapply(nuclBinsL, .subset, 1), ybottom = 10^(par("usr")[3]),
+     xright = sapply(nuclBinsL, .subset, 2), ytop = 10^(par("usr")[4]),
+     col = c("#8DD3C733", "#BEBADA33", "#FB807233"), border = NA)
+lines(xs[keep], freq[keep], col="darkgray")
+lines(xs, pfreq, col = "red", lty = 1, lwd = 1)
+legend("bottomleft", c("observed", paste0("fit (span = ", lspan, ")")),
+       lwd = 1, col = c("darkgray", "red"), bty = "n")
+## ... residuals
+xlims <- c(0, max(unlist(nuclBinsL)) + 100)
+ylims <- c(-.0015, .0015)
+plot(xs, rfreq / 1e-4, type = "n",
+     xlab = "Fragment size (bp)", ylab = "Residual frequency (*1e-4)",
+     xlim = xlims, ylim = ylims / 1e-4)
+rect(xleft = sapply(nuclBinsL, .subset, 1), ybottom = par("usr")[3],
+     xright = sapply(nuclBinsL, .subset, 2), ytop = par("usr")[4],
+     col = c("#8DD3C733", "#BEBADA33", "#FB807233"), border = NA)
+text(x = sapply(nuclBinsL, mean), y = par("usr")[3] + par("cxy")[2],
+     labels=avgFragLength, adj = c(0.5, 0))
+lines(xs, rfreq / 1e-4, col = "darkgray")
+lines(xs, predict(fit2, xs) / 1e-4, col = "red")
+points(avgFragLength, predict(fit2, avgFragLength) / 1e-4, pch = 21,
+       col = "darkgray", bg = "red", cex = 1)
+legend("topright", c("observed", paste0("fit (span = ", rspan, ")"),
+                     sprintf("NRL = %.1f", estNRL)),
+       lwd = c(1, 1, NA), col = c("darkgray", "red", NA), bty="n")
+dev.off()
+
+```
+
+
+###Figure 7C-D
+##MNase-Seq NRL calculated with previously published code 
+
+```{r}
+#upload libraries 
+library(GenomicRanges)
+library(AnnotationDbi)
+library(devtools)
+library(BSgenome.Hsapiens.UCSC.hg19)
+library(tidyverse)
+## refer to swissknife GitHub to install: https://github.com/fmicompbio/swissknife
+library(swissknife)
+
+#bam files umerged:
+T0hA_bam_MN <- "/Volumes/TimeMachine/5872/5872-MB-1.con.hg19.F4q10.sorted.bam"
+T0hB_bam_MN <- "/Volumes/TimeMachine/5872/5872-MB-2.con.hg19.F4q10.sorted.bam"
+T2hA_bam_MN <- "/Volumes/TimeMachine/5872/5872-MB-3.con.hg19.F4q10.sorted.bam"
+T2hB_bam_MN <- "/Volumes/TimeMachine/5872/5872-MB-4.con.hg19.F4q10.sorted.bam"
+T6hA_bam_MN <- "/Volumes/TimeMachine/5872/5872-MB-5.con.hg19.F4q10.sorted.bam"
+T6hB_bam_MN <- "/Volumes/TimeMachine/5872/5872-MB-6.con.hg19.F4q10.sorted.bam"
+T24hA_bam_MN <- "/Volumes/TimeMachine/5872/5872-MB-7.con.hg19.F4q10.sorted.bam"
+T24hB_bam_MN <- "/Volumes/TimeMachine/5872/5872-MB-8.con.hg19.F4q10.sorted.bam"
+
+#Add bam files-merged
+T0hbamfile_MN <- "/Volumes/MBomber_Ext/5872-mergedbam/5872-1-2.hg19.con.sort.F4q10.bam"
+T2hbamfile_MN <- "/Volumes/MBomber_Ext/5872-mergedbam/5872-3-4.hg19.con.sort.F4q10.bam"
+T6hbamfile_MN <- "/Volumes/MBomber_Ext/5872-mergedbam/5872-5-6.hg19.con.sort.F4q10.bam"
+T24hbamfile_MN <- "/Volumes/MBomber_Ext/5872-mergedbam/5872-7-8.hg19.con.sort.F4q10.bam"
+
+#create whole genome GRanges object  
+chrs <- tileGenome(seqlengths = seqlengths(BSgenome.Hsapiens.UCSC.hg19)[1:22],
+                   tilewidth = max(seqlengths(BSgenome.Hsapiens.UCSC.hg19)),
+                   cut.last.tile.in.chrom = TRUE)
+names(chrs) <- rep("genome",length(chrs))
+
+seqlengths(BSgenome.Hsapiens.UCSC.hg19)[1:22]
+
+#Example of calculating NRL and creating phasograms with swissknife 
+Phasogram_merged0A <- calcPhasogram(T0hbamfile_MN, regions = chrs, rmdup = TRUE, dmax = 1000)
+estimateNRL(Phasogram_merged0A, usePeaks = 1:4)
+pdf("/Volumes/BombXtreme/5872-MNase/5872_phasing/5872_phasingTSS/5872_chrs.T0hmerged.pdf", height = 6, width = 7, pointsize = 16)
+plotPhasogram(Phasogram_merged0A,usePeaks = 1:4, xlim = c(0,1000))
+dev.off()
+
+```
