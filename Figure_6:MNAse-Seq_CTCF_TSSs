@@ -1,0 +1,97 @@
+##MNAse-seq cleaning and aligning 
+```{bash}
+#Trimmomatic example
+java -classpath {SOFTWARE_DIR}/Trimmomatic-0.32/trimmomatic-0.32.jar org.usadellab.trimmomatic.TrimmomaticPE -phred33 \
+../5872-Rawfiles/5872-MB-3_S1_L005_R1_001.fastq.gz ../5872-Rawfiles/5872-MB-3_S1_L005_R2_001.fastq.gz \
+5872-MB-3_R1.noadap.paired.txt 5872-MB-3_R1.noadap.unpaired.txt 5872-MB-3_R2.noadap.paired.txt 5872-MB-3_R2.noadap.unpaired.txt \
+ILLUMINACLIP:TruSeq_CD_adapter.txt:2:30:7 LEADING:15 TRAILING:15 MINLEN:15 
+ 
+#Bowtie2 example
+bowtie2 -p 8 --very-sensitive --phred33 -x /Volumes/Mbomber3/hg19_dm3/hg19+dm3 -1 ../5872-trim/5872-MB-3_R1.noadap.paired.txt \
+-2 ../5872-trim/5872-MB-3_R2.noadap.paired.txt -S 5872-MB-3.hg19dm.sam
+
+#samtools example
+samtools view -S -b -@ 10 5872-MB-3.hg19dm.sam > 5872-MB-3.hg19dm.bam
+
+samtools sort 5872-MB-3.hg19dm.bam 5872-MB-3.hg19dm.sorted
+
+samtools view -b -F 4 -q 10 5872-MB-3.hg19dm.sorted.bam > 5872-MB-3.hg19dm.sorted.sorted.F4q10.bam
+
+samtools view -bh 5872-MB-1.hg19dm.F4q10.sorted.bam chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 \
+chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX chrY > 5872-MB-1.hg19.F4q10.sorted.bam
+
+samtools index 5872-MB-1.hg19.F4q10.sorted.bam
+```
+#Deeptools 
+
+```{conda}
+conda activate Deeptools_April2020
+
+alignmentSieve -b ../5872-MB-3.con.hg19.F4q10.sorted.bam --minFragmentLength 140 --maxFragmentLength 200 -p 6 \
+-o 5872-MB-3.con.hg19.F4q10.sorted.alignsieve140-200.BLfiltered.bam -bl /Volumes/BombXtreme/hg19_scer_genomes/hg19_blacklist/hg19.blacklistpeaks.bed
+
+conda deactivate 
+```
+
+##MNAse-seq CTCF heatmaps
+#1. Used FIMO to isolate CTCF motif from CTCF CUT&RUN
+```{conda}
+conda activate FIMO_MEME
+#command 1: make bed file to Fasta file 
+bedtools getfasta -fi {GENOME_DIR}/hg19.fa -bed ../counttable_raw-CTCF-q0.05-removedBLwithDiffbind.BED.txt > 5176_CTCFall.fasta.bed
+#command 2: use FIMO, Fasta file, and meme matrix file to get CTCF motifs  
+fimo --oc FIMO_5176_CTCF_parsegc --parse-genomic-coord  ~/Downloads/MA0139.1.meme 5176_CTCFall.fasta.bed.fa.bed
+conda deactivate 
+```
+#2 R isolate +/- 2kb around center of the CTCF motifs
+``{r}
+library(AnnotationDbi)
+library(GenomicRanges)
+library(tidyverse)
+
+CTCFmotifs <- read_tsv("{CTCF_DIR}/fimo.parsegc.5176_CTCFall.motifs.bed.txt")
+GRanges_CTCFmotifs <- makeGRangesFromDataFrame(CTCFmotifs,
+                                                keep.extra.columns=FALSE,
+                                                ignore.strand=FALSE,
+                                                seqinfo=NULL,
+                                                seqnames.field=c("#sequence_name", "seqname",
+                                                                 "chromosome", "chrom",
+                                                                 "chr", "chromosome_name",
+                                                                 "seqid"),
+                                                start.field=c("starts","start"),
+                                                end.field=c("ends", "stop"),
+                                                strand.field="strand",
+                                                starts.in.df.are.0based=FALSE)
+head(GRanges_CTCFmotifs)
+
+GRanges_CTCFsigdn24_center_4k <- resize(GRanges_CTCFmotifs, fix = "center", 1)
+start(GRanges_CTCFsigdn24_center_4k) <- start(GRanges_CTCFsigdn24_center_4k) - 2000 
+end(GRanges_CTCFsigdn24_center_4k) <- start(GRanges_CTCFsigdn24_center_4k) + 4000 
+head(GRanges_CTCFsigdn24_center_4k)
+GRanges_CTCFsigdn24_center_4kdf <- as.data.frame(GRanges_CTCFsigdn24_center_4k)
+write_tsv(GRanges_CTCFsigdn24_center_4kdf, "{CTCF_DIR}/5176_annotated/5176.fimo.pargec.motifcenterCTCFplus2kbminus2kb.Granges.noheader.txt", col_names = FALSE)
+```
+
+```{bash}
+#bedtools merge the CTCF peaks overlapping 
+bedtools merge -i /Volumes/BombXtreme/5176_CutRun_CTCF/5176_CTCF_R-ouput/5176_annotated/ \
+5176.fimo.pargec.motifcenterCTCFplus2kbminus2kb.Granges.noheader.sorted.txt > \
+/Volumes/BombXtreme/5176_CutRun_CTCF/5176_CTCF_R-ouput/5176_annotated/5176.fimo.pargec.motifcenterCTCFplus2kbminus2kb.Granges.noheader.sorted.merged.txt
+
+#samtools overlapping CTCF peaks within the bam files 
+samtools view -b -h -L ${GENOME_DIR}/5176.fimo.pargec.motifcenterCTCFplus2kbminus2kb.Granges.noheader.sorted.merged.txt \
+${BAM_DIR}/5872-MB-${i}.con.hg19.F4q10.sorted.alignsieve140-200.BLfiltered.bam \
+> ${PROCESSED_DIR}/5872-MB-${i}.con.hg19.F4q10.sorted.alignsieve140-200.BLfiltered.bam 		
+
+samtools index ${BAM_DIR}/5872-MB-${i}.con.hg19.F4q10.sorted.alignsieve140-200.BLfiltered.CTCF.bam
+```
+
+#Deeptools 
+```{conda}
+conda activate Deeptools_April2020
+
+bamCoverage -b ${BAM_DIR}/5872-MB-${i}.con.hg19.F4q10.sorted.alignsieve140-200.BLfiltered.CTCF.bam --MNase --normalizeUsing CPM -bs 1 -p 6 -of bigWig \
+-o ${PROCESSED_DIR}/5872-MB-${i}.MNase.CPM.CTCFregion.bs1.bw
+
+conda deactivate 
+```
