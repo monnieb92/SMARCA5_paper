@@ -11,12 +11,12 @@ samtools #Version: 0.1.19-44428cd
 # Homer
 findMotifsGenome.pl file.bed hg19 OUTPUT_DIR/ -size given -mask 
 ```
-### *Any annotated peak analysis:*
+### *Overlapping peak files:* 
 ```{bash}
 # Homer
 mergePeaks -d given peakfile1.bed peakfile2.bed > output_overlappedpeaks_file.txt
 ```
-### *Overlapping peak files:* 
+### *Any annotated peak analysis:*
 ```{bash}
 # Homer
 annotatePeaks.pl peakfile.bed hg19 > output_annotated_file.txt
