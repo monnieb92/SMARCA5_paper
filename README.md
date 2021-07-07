@@ -1,4 +1,4 @@
-# **SMARCA5_paper**
+# **Human SMARCA5 Is Continuously Required to Maintain Nucleosome Spacing **
 ### *Software Required for each Figure to remove adapters, align, and clean up .sam files:*
 ```{bash}
 #Remove adapter and align
