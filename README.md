@@ -1,5 +1,5 @@
 # **SMARCA5_paper**
-### *Software Required for each Figure to remove adapters, align, and clean up .sam files:*
+### @@*Software Required for each Figure to remove adapters, align, and clean up .sam files:*@@
 ```{bash}
 #Remove adapter and align
 trimmomatic-0.32.jar
