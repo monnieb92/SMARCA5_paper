@@ -1,6 +1,6 @@
-###FIGURE3
+### FIGURE3
 
-##PRO-Seq aligning and cleaning data  
+## PRO-Seq aligning and cleaning data  
 ```{bash}
 #EXAMPLE TRIMMOMATIC
 java -classpath {SOFTWARE_DIR}/trimmomatic-0.32.jar org.usadellab.trimmomatic.TrimmomaticSE \
