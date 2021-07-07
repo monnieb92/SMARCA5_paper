@@ -1,22 +1,22 @@
 # SMARCA5_paper
-## Software Required for each Figure to remove adapters, align, and clean up .sam files:
+### Software Required for each Figure to remove adapters, align, and clean up .sam files:
 ```{bash}
 #Remove adapter and align
 trimmomatic-0.32.jar
 bowtie2
 samtools
 ```
-## Any motif analysis: 
+### Any motif analysis: 
 ```{bash}
 # Homer
 findMotifsGenome.pl file.bed hg19 OUTPUT_DIR/ -size given -mask
 ```
-## Any annotated peak analysis: 
+### Any annotated peak analysis: 
 ```{bash}
 # Homer
 mergePeaks -d given peakfile1.bed peakfile2.bed > output_overlappedpeaks_file.txt
 ```
-## Overlapping peak files: 
+### Overlapping peak files: 
 ```{bash}
 # Homer
 annotatePeaks.pl peakfile.bed hg19 > output_annotated_file.txt
