@@ -48,6 +48,7 @@ Diffbind
 DESeq2
 ```
 ## Figure 3: PRO-Seq
+### Necessary packages: 
 ```{bash}
 #NRSA (http://bioinfo.vanderbilt.edu/NRSA/)
 
@@ -60,6 +61,7 @@ ComplexHeatmap
 circlize
 ```
 ## Figure 4: ATAC-Seq
+### Necessary packages: 
 ```{bash}
 #Install Genrich into conda envrionment (https://anaconda.org/bioconda/genrich)
 conda install -c bioconda genrich
@@ -76,6 +78,20 @@ tidyverse
 Diffbind
 DESeq2
 ```
-## Figure 5
+## Figure 5: CUT&RUN CTCF, RUNX1, AML1-ETO
+### Necessary packages: 
+```{bash}
+#Callpeaks
+macs2 callpeak -q 0.05 -f BAMPE --keep-dup all
+```
+```{r}
+# R packages
+dplyr
+tidyverse
+Diffbind
+DESeq2
+```
 ## Figure 6
+### Necessary packages: 
 ## Figure 7
+### Necessary packages: 
