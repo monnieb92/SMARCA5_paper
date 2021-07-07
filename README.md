@@ -3,8 +3,8 @@
 ```{bash}
 #Remove adapter and align
 trimmomatic-0.32.jar
-bowtie2
-samtools
+bowtie2 #version 2.2.2
+samtools #Version: 0.1.19-44428cd
 ```
 ### *Any motif analysis:* 
 ```{bash}
@@ -23,6 +23,7 @@ annotatePeaks.pl peakfile.bed hg19 > output_annotated_file.txt
 ```
 ### *Creating deeptools heatmaps:* 
 ```{bash}
+#deeptools 3.4.1
 #First Create bigwig file (make sure .bam file is indexed)
 bamCoverage -b file.bam -of 'bigwig' -bs 5 -p 6 -o filename.bw
 
@@ -37,15 +38,15 @@ plotHeatmap -m matrix_filename.gz --colorList 'white,purple' -o heatmap_filename
 ## Figure 2: CUT&RUN SMARCA5 (FLAG)
 ### Necessary packages: 
 ```{bash}
-#Callpeaks
+#Callpeaks macs2 2.2.6
 macs2 callpeak -q 0.001 -f BAMPE --keep-dup all
 ```
 ```{r}
 # R packages
-dplyr
-tidyverse
-Diffbind
-DESeq2
+dplyr #1.0.6
+tidyverse #1.3.1
+Diffbind #3.0.15
+DESeq2 #1.30.1
 ```
 ## Figure 3: PRO-Seq
 ### Necessary packages: 
@@ -55,10 +56,10 @@ DESeq2
 ```
 ```{r}
 # R packages
-dplyr
-tidyverse
-ComplexHeatmap
-circlize
+dplyr #1.0.6
+tidyverse #1.3.1
+ComplexHeatmap #2.7.4
+circlize #0.4.12
 ```
 ## Figure 4: ATAC-Seq
 ### Necessary packages: 
@@ -73,23 +74,23 @@ Genrich -t file.sortn.bam -j -r -E {ENCODE_download}/hg19.blacklistpeaks.bed \
 ```
 ```{r}
 # R packages
-dplyr
-tidyverse
-Diffbind
-DESeq2
+dplyr #1.0.6
+tidyverse #1.3.1
+Diffbind #3.0.15
+DESeq2 #1.30.1
 ```
 ## Figure 5: CUT&RUN CTCF, RUNX1, AML1-ETO
 ### Necessary packages: 
 ```{bash}
-#Callpeaks
+#Callpeaks macs2 2.2.6
 macs2 callpeak -q 0.05 -f BAMPE --keep-dup all
 ```
 ```{r}
 # R packages
-dplyr
-tidyverse
-Diffbind
-DESeq2
+dplyr #1.0.6
+tidyverse #1.3.1
+Diffbind #3.0.15
+DESeq2 #1.30.1
 ```
 ## Figure 6: MNase-seq Phasing around CTCF motifs
 ### Necessary packages: 
