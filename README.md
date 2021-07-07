@@ -113,3 +113,13 @@ tidyverse #1.3.1
 ```
 ## Figure 7: ATAC-seq and MNase-seq nucleosome repeat length calculations (NRL)
 ### Necessary packages: 
+```{r}
+#R packages #version
+BSgenome.Hsapiens.UCSC.hg19 #1.4.3
+Rsamtools #2.6.0
+AnnotationDbi #1.52.0
+GenomicRanges #1.42.0
+tidyverse #1.3.1
+swissknife #version: 0.28
+devtools #2.4.2
+```
