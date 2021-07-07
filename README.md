@@ -94,5 +94,22 @@ DESeq2 #1.30.1
 ```
 ## Figure 6: MNase-seq Phasing around CTCF motifs
 ### Necessary packages: 
+#### deeptools
+```{}
+alignmentSieve -b file.bam --minFragmentLength 140 --maxFragmentLength 200 -p 6 \
+-o file.alignsieve140-200.BLfiltered.bam -bl {ENCODE}/hg19.blacklistpeaks.bed
+
+bamCoverage -b file.bam -of 'bigwig' -bs 1 -p 6 --normalizeUsing CPM --MNase -o filename.bw
+```
+#### FIMO 4.12.0
+ Determine CTCF motif center 
+#### bedtools v2.30.0
+```{r}
+#R packages
+Rsamtools #2.6.0
+AnnotationDbi #1.52.0
+GenomicRanges #1.42.0
+tidyverse #1.3.1
+```
 ## Figure 7: ATAC-seq and MNase-seq nucleosome repeat length calculations (NRL)
 ### Necessary packages: 
