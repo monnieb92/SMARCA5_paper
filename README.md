@@ -1,7 +1,7 @@
 # SMARCA5_paper
 ## Figure 2: CUT&RUN SMARCA5 (FLAG)
 ### Necessary packages: 
-```{bash}
+```{bash, callpeaks}
 macs2
 ```
 ```{r}
