@@ -91,7 +91,7 @@ tidyverse
 Diffbind
 DESeq2
 ```
-## Figure 6
+## Figure 6: MNase-seq Phasing around CTCF motifs
 ### Necessary packages: 
-## Figure 7
+## Figure 7: ATAC-seq and MNase-seq nucleosome repeat length calculations (NRL)
 ### Necessary packages: 
