@@ -40,8 +40,28 @@ DESeq2
 
 ```
 ```{r}
+# R packages
+dplyr
+tidyverse
+ComplexHeatmap
+circlize
 ```
-## Figure 4
+## Figure 4: ATAC-Seq
+```{bash}
+#Install Genrich into conda envrionment (https://anaconda.org/bioconda/genrich)
+conda install -c bioconda genrich
+# Call peaks Genrich
+conda activate Genrich 
+
+Genrich -t file.sortn.bam -j -r -E {ENCODE_download}/hg19.blacklistpeaks.bed -q 0.05 -o FILENAME.j.r.Eblacklist.q0.05.narrowPeak
+```
+```{r}
+# R packages
+dplyr
+tidyverse
+Diffbind
+DESeq2
+```
 ## Figure 5
 ## Figure 6
 ## Figure 7
