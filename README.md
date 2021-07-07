@@ -9,7 +9,7 @@ samtools
 ### *Any motif analysis:* 
 ```{bash}
 # Homer
-@@ Pink @@ findMotifsGenome.pl file.bed hg19 OUTPUT_DIR/ -size given -mask
+findMotifsGenome.pl file.bed hg19 OUTPUT_DIR/ -size given -mask 
 ```
 ### *Any annotated peak analysis:*
 ```{bash}
