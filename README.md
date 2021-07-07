@@ -66,7 +66,8 @@ conda install -c bioconda genrich
 # Call peaks Genrich
 conda activate Genrich 
 
-Genrich -t file.sortn.bam -j -r -E {ENCODE_download}/hg19.blacklistpeaks.bed -q 0.05 -o FILENAME.j.r.Eblacklist.q0.05.narrowPeak
+Genrich -t file.sortn.bam -j -r -E {ENCODE_download}/hg19.blacklistpeaks.bed \
+-q 0.05 -o FILENAME.j.r.Eblacklist.q0.05.narrowPeak
 ```
 ```{r}
 # R packages
