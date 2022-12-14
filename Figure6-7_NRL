@@ -1,5 +1,5 @@
 
-###Figure7A-B
+###Figure6
 ##NRL ATAC-Seq
 ##modified code from the original--- Inference of nucleosome repeat length (nucleosome + one linker) from ATAC-seq data
 ## modified code from the original---as applied in Barisic D, Stadler MB, Iurlaro M, Schübeler D. Nature 2019 May;569(7754):136-140. PMID: 30996347
@@ -26,7 +26,7 @@ chrs <- tileGenome(seqlengths = seqlengths(BSgenome.Hsapiens.UCSC.hg19)[1:22],
 names(chrs) <- rep("genome",length(chrs))
 glimpse(chrs)
 
-#bam files umerged:
+#bam files:
 T0hA_bam <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-MB-3.hg19.sorted.F4q10.bam"
 T0hB_bam <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-MB-4.hg19.sorted.F4q10.bam"
 T2hA_bam <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-MB-5.hg19.sorted.F4q10.bam"
@@ -36,11 +36,6 @@ T6hB_bam <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-MB-8.hg19
 T24hA_bam <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-MB-9.hg19.sorted.F4q10.bam"
 T24hB_bam <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-MB-10.hg19.sorted.F4q10.bam"
 
-#Add bam files-merged
-T0hbamfile <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-hg19-mergedbam/3910-MB-3-4.hg19.sorted.F4q10.bam"
-T2hbamfile <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-hg19-mergedbam/3910-MB-5-6.hg19.sorted.F4q10.bam"
-T6hbamfile <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-hg19-mergedbam/3910-MB-7-8.hg19.sorted.F4q10.bam"
-T24hbamfile <- "/Volumes/MBomber_Ext/3910bam-wdup/3910-hg19-bam-wdup/3910-hg19-mergedbam/3910-MB-9-10.hg19.sorted.F4q10.bam"
 ## ... loess fit smoothing parameter 1
 ##     a first loess fit with this parameter will be fit to the fragment length distribution
 ##     in log space, in order to capture the (low-frequency) decrease of fragment frequencies
@@ -176,7 +171,7 @@ dev.off()
 ```
 
 
-###Figure 7C-D
+###Figure 7
 ##MNase-Seq NRL calculated with previously published code 
 
 ```{r}
@@ -199,11 +194,6 @@ T6hB_bam_MN <- "/Volumes/TimeMachine/5872/5872-MB-6.con.hg19.F4q10.sorted.bam"
 T24hA_bam_MN <- "/Volumes/TimeMachine/5872/5872-MB-7.con.hg19.F4q10.sorted.bam"
 T24hB_bam_MN <- "/Volumes/TimeMachine/5872/5872-MB-8.con.hg19.F4q10.sorted.bam"
 
-#Add bam files-merged
-T0hbamfile_MN <- "/Volumes/MBomber_Ext/5872-mergedbam/5872-1-2.hg19.con.sort.F4q10.bam"
-T2hbamfile_MN <- "/Volumes/MBomber_Ext/5872-mergedbam/5872-3-4.hg19.con.sort.F4q10.bam"
-T6hbamfile_MN <- "/Volumes/MBomber_Ext/5872-mergedbam/5872-5-6.hg19.con.sort.F4q10.bam"
-T24hbamfile_MN <- "/Volumes/MBomber_Ext/5872-mergedbam/5872-7-8.hg19.con.sort.F4q10.bam"
 
 #create whole genome GRanges object  
 chrs <- tileGenome(seqlengths = seqlengths(BSgenome.Hsapiens.UCSC.hg19)[1:22],
