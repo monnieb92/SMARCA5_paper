@@ -11,6 +11,20 @@ samtools #Version: 0.1.19-44428cd
 # Homer
 findMotifsGenome.pl file.bed hg19 OUTPUT_DIR/ -size given -mask 
 ```
+```{r}
+#Motif Enrichment from Emily Hodge's Lab
+#function
+format_motif_results <- function(df){
+  df <- mutate(df, percentTargetNum = (as.numeric(gsub("%", "", percentTarget, fixed = TRUE))/100))
+  df <- mutate(df, percentBackgroundNum = (as.numeric(gsub("%", "", percentBackground, fixed = TRUE))/100))
+  df <- mutate(df, percentFold = (percentTargetNum/percentBackgroundNum))
+  df <- mutate(df, Motif = gsub('\\(.*', "", MotifName))
+  df <- dplyr::filter(df, percentFold != "Inf")
+  df$Motif <- factor(df$Motif,levels=rev(unique(df$Motif)))
+  # Plot with GGPlot
+  return(df)
+}
+```
 ### *Overlapping peak files:* 
 ```{bash}
 # Homer
@@ -48,19 +62,21 @@ tidyverse #1.3.1
 Diffbind #3.0.15
 DESeq2 #1.30.1
 ```
-## Figure 3: PRO-Seq
+## Figure 3: CUT&RUN CTCF, RUNX1, AML1-ETO
 ### Necessary packages: 
 ```{bash}
-#NRSA (http://bioinfo.vanderbilt.edu/NRSA/)
-
+#Callpeaks macs2 2.2.6
+macs2 callpeak -q 0.05 -f BAMPE --keep-dup all
 ```
 ```{r}
 # R packages
 dplyr #1.0.6
 tidyverse #1.3.1
-ComplexHeatmap #2.7.4
-circlize #0.4.12
+Diffbind #3.0.15
+DESeq2 #1.30.1
 ```
+
+
 ## Figure 4: ATAC-Seq
 ### Necessary packages: 
 ```{bash}
@@ -79,39 +95,22 @@ tidyverse #1.3.1
 Diffbind #3.0.15
 DESeq2 #1.30.1
 ```
-## Figure 5: CUT&RUN CTCF, RUNX1, AML1-ETO
+## Figure 5: PRO-Seq and RNA-seq
 ### Necessary packages: 
 ```{bash}
-#Callpeaks macs2 2.2.6
-macs2 callpeak -q 0.05 -f BAMPE --keep-dup all
+#NRSA (http://bioinfo.vanderbilt.edu/NRSA/)
+
 ```
 ```{r}
 # R packages
 dplyr #1.0.6
-tidyverse #1.3.1
-Diffbind #3.0.15
 DESeq2 #1.30.1
-```
-## Figure 6: MNase-seq Phasing around CTCF motifs
-### Necessary packages: 
-#### deeptools
-```{}
-alignmentSieve -b file.bam --minFragmentLength 140 --maxFragmentLength 200 -p 6 \
--o file.alignsieve140-200.BLfiltered.bam -bl {ENCODE}/hg19.blacklistpeaks.bed
-
-bamCoverage -b file.bam -of 'bigwig' -bs 1 -p 6 --normalizeUsing CPM --MNase -o filename.bw
-```
-#### FIMO 4.12.0
- Determine CTCF motif center 
-#### bedtools v2.30.0
-```{r}
-#R packages
-Rsamtools #2.6.0
-AnnotationDbi #1.52.0
-GenomicRanges #1.42.0
 tidyverse #1.3.1
+ComplexHeatmap #2.7.4
+circlize #0.4.12
 ```
-## Figure 7: ATAC-seq and MNase-seq nucleosome repeat length calculations (NRL)
+
+## Figure 6/7: ATAC-seq and MNase-seq nucleosome repeat length calculations (NRL)
 ### Necessary packages: 
 ```{r}
 #R packages #version
@@ -122,4 +121,24 @@ GenomicRanges #1.42.0
 tidyverse #1.3.1
 swissknife #version: 0.28
 devtools #2.4.2
+```
+
+## Figure 7: MNase-seq Phasing around CTCF motifs
+### Necessary packages: 
+#### deeptools
+```{}
+alignmentSieve -b file.bam --minFragmentLength 120 --maxFragmentLength 210 -p 6 \
+-o file.alignsieve140-200.BLfiltered.bam -bl {ENCODE}/hg19.blacklistpeaks.bed
+
+bamCoverage -b file.bam -of 'bigwig' -bs 1 -p 6 --normalizeUsing CPM --MNase -o filename.bw --minFragmentLength 130 --maxFragmentLength 210
+```
+#### FIMO 4.12.0
+ Determine CTCF motif center 
+#### bedtools v2.30.0
+```{r}
+#R packages
+Rsamtools #2.6.0
+AnnotationDbi #1.52.0
+GenomicRanges #1.42.0
+tidyverse #1.3.1
 ```
