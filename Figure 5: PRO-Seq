@@ -1,0 +1,206 @@
+### FIGURE5
+
+## PRO-Seq aligning and cleaning data  
+```{bash}
+#EXAMPLE TRIMMOMATIC
+java -classpath {SOFTWARE_DIR}/trimmomatic-0.32.jar org.usadellab.trimmomatic.TrimmomaticSE \
+-phred33 3568-SAMPLE1_R1_001.fastq.gz 3568-SAMPLE1.75.adap.trail.15bp.txt \
+CROP:75 ILLUMINACLIP:adaptor-8.txt:2:30:7 TRAILING:15 MINLEN:15
+
+#EXAMPLE REVCOMP
+fastx_reverse_complement -Q33 -i 3568-SAMPLE1.75.adap.trail.15bp.txt -o 3568-SAMPLE1.75.adap.trail.15bp.revcomp.txt
+
+#EXAMPLE BOWTIE2
+bowtie2 -p 2 --mm -x {GENOME_DIR}/hg19+dm3 -U 3568-SAMPLE1.75.adap.trail.15bp.revcomp.txt -S  3568-SAMPLE1.hgdm.sam
+
+#EXAMPLE SAMTOOLS
+samtools view -S -b -@ 10  3568-SAMPLE1.hgdm.sam >  3568-SAMPLE1.hgdm.bam
+
+samtools sort  3568-SAMPLE1.hgdm.bam  3568-SAMPLE1.hgdm.sorted
+
+samtools view -b -F 4 -q 10 3568-SAMPLE1.hgdm.sorted.bam > 3568-SAMPLE1.hgdm.sorted.F4q10.bam
+
+samtools view -bh 3568-SAMPLE1.hgdm.sorted.F4q10.bam chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 \
+chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX chrY \
+> 3568-SAMPLE1.hg19.sorted.F4q10.bam
+
+samtools index 3568-SAMPLE1.hg19.sorted.F4q10.bam
+
+#EXAMPLE BEDTOOLS
+
+bedtools intersect -wa -v -abam ${BAMHG19}/5641-MB-${i}.hg19.F4q10.sorted.bam -b ${BLACKLIST}/hg19.blacklistpeaks.bed > ${BAMHG19}/5641-MB-${i}.hg19.F4q10.sorted.BLfiltered.bam
+
+```
+##NRSA 
+```{bash}
+pause_PROseq.pl -cgbd 0.004 -o 3568_T0vT2h_cpgd0.004/ \
+-in1 3568-hg19-bam/3568-SAMPLE1.hg19.sorted.F3q10.bam 3568-hg19-bam/3568-SAMPLE2.hg19.sorted.F4q10.BLfiltered.bam 3191-hg19-bam/3191-SAMPLE3.hg19.sorted.F4q10.BLfiltered.bam 5641-hg19-bam/5641-SAMPLE4.hg19.sorted.F4q10.BLfiltered.bam\
+-in2 3568-hg19-bam3568-SAMPLE5.hg19.sorted.F4q10.BLfiltered.bam 3568-hg19-bam/3568-SAMPLE6.hg19.sorted.F4q10.BLfiltered.bam 5641-hg19-bam/5641-SAMPLE7.hg19.sorted.F4q10.BLfiltered.bam 5641-hg19-bam/5641-SAMPLE8.hg19.sorted.F4q10.BLfiltered.bam
+```
+
+##Figure Example 3A (significant genebody changes)
+
+```{r}
+#packages
+library(tidyr)
+library(dplyr)
+library(tidyverse)
+library(readr)
+library(DESeq2)
+```
+
+```{r}
+count_pp_gb_0v6h_4reps <- read.delim("3191_5641_3568_T0hvT6hdT.cgbd0.004/intermediate/count_pp_gb.txt")
+
+count_pp_gb_0v2h_4reps <- read.delim("3191_5641_3568_T0hvT2hdT.cgbd0.004/intermediate/count_pp_gb.txt")
+
+count_pp_gb_0v24h_4reps <- read.delim("3191_5641_3568_T0hvT24hdT.cgbd0.004/intermediate/count_pp_gb.txt")
+```
+
+## Process files Exp for GBC and PPC to filter out not expressed genes 
+Select gene body count columns (gbc), rename columns, left join by “Transcript”
+
+```{r, echo=TRUE,results='hide'}
+
+gbc_ppc_alltps_counts <- count_pp_gb_0v2h_4reps %>%
+  left_join(count_pp_gb_0v6h_4reps, by = "Transcript", suffix = c("_2h", "_6h")) %>%
+  left_join(count_pp_gb_0v24h_4reps, by = "Transcript", suffix = c("_6h", "_24h")) %>%
+  dplyr::select(Transcript,T0hA_3191_gbc = "gbc_3191.MB.3.hg19.sorted.F4q10.BLfiltered_6h",T0hB_3191_gbc = "gbc_3191.MB.4.hg19.sorted.F4q10.BLfiltered_6h", T0hA_5641_gbc = "gbc_5641.MB.1.hg19.F4q10.sorted.BLfiltered_6h", T0hA_3568_gbc = "gbc_3568.MB.1.hg19.sorted.F4q10.BLfiltered_6h", T0hB_3568_gbc = "gbc_3568.MB.2.hg19.sorted.F4q10.BLfiltered_6h",T2hA_3568_gbc = "gbc_3568.MB.3.hg19.sorted.F4q10.BLfiltered", T2hB_3568_gbc = "gbc_3568.MB.4.hg19.sorted.F4q10.BLfiltered", T2hB_3191_gbc = "gbc_3191.MB.8.hg19.sorted.F4q10.BLfiltered",T6hA_3568_gbc = "gbc_3568.MB.5.hg19.sorted.F4q10.BLfiltered", T6hB_3568_gbc = "gbc_3568.MB.6.hg19.sorted.F4q10.BLfiltered",T6hA_5641_gbc = "gbc_5641.MB.3.hg19.F4q10.sorted.BLfiltered",T6hB_5641_gbc = "gbc_5641.MB.4.hg19.F4q10.sorted.BLfiltered",T24hA_3568_gbc = "gbc_3568.MB.7.hg19.sorted.F4q10.BLfiltered", T24hB_3568_gbc = "gbc_3568.MB.8.hg19.sorted.F4q10.BLfiltered",T0hA_3191_ppc = "ppc_3191.MB.3.hg19.sorted.F4q10.BLfiltered_6h",T0hB_3191_ppc = "ppc_3191.MB.4.hg19.sorted.F4q10.BLfiltered_6h", T0hA_5641_ppc = "ppc_5641.MB.1.hg19.F4q10.sorted.BLfiltered_6h", T0hA_3568_ppc = "ppc_3568.MB.1.hg19.sorted.F4q10.BLfiltered_6h", T0hB_3568_ppc = "ppc_3568.MB.2.hg19.sorted.F4q10.BLfiltered_6h",T2hA_3568_ppc = "ppc_3568.MB.3.hg19.sorted.F4q10.BLfiltered", T2hB_3568_ppc = "ppc_3568.MB.4.hg19.sorted.F4q10.BLfiltered",T2hB_3191_ppc = "ppc_3191.MB.8.hg19.sorted.F4q10.BLfiltered",T6hA_3568_ppc = "ppc_3568.MB.5.hg19.sorted.F4q10.BLfiltered", T6hB_3568_ppc = "ppc_3568.MB.6.hg19.sorted.F4q10.BLfiltered",T6hA_5641_ppc = "ppc_5641.MB.3.hg19.F4q10.sorted.BLfiltered",T6hB_5641_ppc= "ppc_5641.MB.4.hg19.F4q10.sorted.BLfiltered",T24hA_3568_ppc = "ppc_3568.MB.7.hg19.sorted.F4q10.BLfiltered", T24hB_3568_ppc = "ppc_3568.MB.8.hg19.sorted.F4q10.BLfiltered", chr_6h,start_6h, end_6h, Gene_6h, Transcript)
+## PPD
+gbc_ppc_alltps_counts$T0hA_3568_ppd <- gbc_ppc_alltps_counts$T0hA_3568_ppc/50
+gbc_ppc_alltps_counts$T0hB_3568_ppd <- gbc_ppc_alltps_counts$T0hB_3568_ppc/50
+gbc_ppc_alltps_counts$T0hA_5641_ppd <- gbc_ppc_alltps_counts$T0hA_5641_ppc/50
+gbc_ppc_alltps_counts$T0hA_3191_ppd <- gbc_ppc_alltps_counts$T0hA_3191_ppc/50
+gbc_ppc_alltps_counts$T0hB_3191_ppd <- gbc_ppc_alltps_counts$T0hB_3191_ppc/50
+gbc_ppc_alltps_counts$T2hA_3568_ppd <- gbc_ppc_alltps_counts$T2hA_3568_ppc/50
+gbc_ppc_alltps_counts$T2hB_3568_ppd <- gbc_ppc_alltps_counts$T2hB_3568_ppc/50
+gbc_ppc_alltps_counts$T2hB_3191_ppd <- gbc_ppc_alltps_counts$T2hB_3191_ppc/50
+gbc_ppc_alltps_counts$T6hA_3568_ppd <- gbc_ppc_alltps_counts$T6hA_3568_ppc/50
+gbc_ppc_alltps_counts$T6hB_3568_ppd <- gbc_ppc_alltps_counts$T6hB_3568_ppc/50
+gbc_ppc_alltps_counts$T6hA_5641_ppd <- gbc_ppc_alltps_counts$T6hA_5641_ppc/50
+gbc_ppc_alltps_counts$T6hB_5641_ppd <- gbc_ppc_alltps_counts$T6hB_5641_ppc/50
+gbc_ppc_alltps_counts$T24hA_3568_ppd <- gbc_ppc_alltps_counts$T24hA_3568_ppc/50
+gbc_ppc_alltps_counts$T24hB_3568_ppd <- gbc_ppc_alltps_counts$T24hB_3568_ppc/50
+
+
+### GBD
+gbc_ppc_alltps_counts$T0hA_5641_gbd <- gbc_ppc_alltps_counts$T0hA_5641_gbc/abs(gbc_ppc_alltps_counts$start_6h-gbc_ppc_alltps_counts$end_6h)
+gbc_ppc_alltps_counts$T0hA_3568_gbd <- gbc_ppc_alltps_counts$T0hA_3568_gbc/abs(gbc_ppc_alltps_counts$start_6h-gbc_ppc_alltps_counts$end_6h)
+gbc_ppc_alltps_counts$T0hB_3568_gbd <- gbc_ppc_alltps_counts$T0hB_3568_gbc/abs(gbc_ppc_alltps_counts$start_6h-gbc_ppc_alltps_counts$end_6h)
+gbc_ppc_alltps_counts$T0hA_3191_gbd <- gbc_ppc_alltps_counts$T0hA_3191_gbc/abs(gbc_ppc_alltps_counts$start_6h-gbc_ppc_alltps_counts$end_6h)
+gbc_ppc_alltps_counts$T0hB_3191_gbd <- gbc_ppc_alltps_counts$T0hB_3191_gbc/abs(gbc_ppc_alltps_counts$start_6h-gbc_ppc_alltps_counts$end_6h)
+gbc_ppc_alltps_counts$T2hA_3568_gbd <- gbc_ppc_alltps_counts$T2hA_3568_gbc/abs(gbc_ppc_alltps_counts$start_6h-gbc_ppc_alltps_counts$end_6h)
+gbc_ppc_alltps_counts$T2hB_3568_gbd <- gbc_ppc_alltps_counts$T2hB_3568_gbc/abs(gbc_ppc_alltps_counts$start_6h-gbc_ppc_alltps_counts$end_6h)
+gbc_ppc_alltps_counts$T2hB_3191_gbd <- gbc_ppc_alltps_counts$T2hB_3191_gbc/abs(gbc_ppc_alltps_counts$start_6h-gbc_ppc_alltps_counts$end_6h)
+gbc_ppc_alltps_counts$T6hA_5641_gbd <- gbc_ppc_alltps_counts$T6hA_5641_gbc/abs(gbc_ppc_alltps_counts$start_6h-gbc_ppc_alltps_counts$end_6h)
+gbc_ppc_alltps_counts$T6hB_5641_gbd <- gbc_ppc_alltps_counts$T6hB_5641_gbc/abs(gbc_ppc_alltps_counts$start_6h-gbc_ppc_alltps_counts$end_6h)
+gbc_ppc_alltps_counts$T6hA_3568_gbd <- gbc_ppc_alltps_counts$T6hA_3568_gbc/abs(gbc_ppc_alltps_counts$start_6h-gbc_ppc_alltps_counts$end_6h)
+gbc_ppc_alltps_counts$T6hB_3568_gbd <- gbc_ppc_alltps_counts$T6hB_3568_gbc/abs(gbc_ppc_alltps_counts$start_6h-gbc_ppc_alltps_counts$end_6h)
+gbc_ppc_alltps_counts$T24hA_3568_gbd <- gbc_ppc_alltps_counts$T24hA_3568_gbc/abs(gbc_ppc_alltps_counts$start_6h-gbc_ppc_alltps_counts$end_6h)
+gbc_ppc_alltps_counts$T24hB_3568_gbd <- gbc_ppc_alltps_counts$T24hB_3568_gbc/abs(gbc_ppc_alltps_counts$start_6h-gbc_ppc_alltps_counts$end_6h)
+
+
+gbc_ppc_alltps_counts_Filtered <- gbc_ppc_alltps_counts %>%
+  filter(T0hA_5641_ppd > 0.01 & T0hA_3568_ppd > 0.01 & T0hB_3568_ppd > 0.01 & T0hA_3191_ppd > 0.01 & T0hB_3191_ppd > 0.01 | T2hA_3568_ppd > 0.01 & `T2hB_3568_ppd` > 0.01 & `T2hB_3191_ppd` > 0.01 & T6hA_3568_ppd > 0.01 & `T6hB_3568_ppd` > 0.01 & `T6hA_5641_ppd` > 0.01 & `T6hB_5641_ppd` > 0.01 & T24hA_3568_ppd > 0.01 & `T24hB_3568_ppd` > 0.01) %>% filter(T0hA_5641_gbd >= 0.004 & T0hA_3568_gbd >= 0.004 & T0hB_3568_gbd >= 0.004 & T0hA_3191_gbd >= 0.004 & T0hB_3191_gbd >= 0.004 | T2hA_3568_gbd >= 0.004 & T2hB_3568_gbd >= 0.004 & T2hB_3191_gbd >= 0.004 &  T6hA_3568_gbd >= 0.004 & T6hB_3568_gbd >= 0.004 & T6hA_5641_gbd >= 0.004 & T6hB_5641_gbd >= 0.004 &T24hA_3568_gbd >= 0.004 & T24hB_3568_gbd >= 0.004)
+
+head(gbc_ppc_alltps_counts_Filtered)
+
+write_tsv(gbc_ppc_alltps_counts_Filtered,"3191-3568-5641-CombinedCountsTable.gbc.ppc.gbd.ppd.txt")
+```
+
+
+## GBC Normalization 
+### Process files for GBC
+Make new data frame with count data only, use Transcript as row name and make another dataframe with condition information for DEseq
+
+```{r, echo=TRUE, results='hide'}
+count_data <- gbc_ppc_alltps_counts_Filtered[,2:15]
+
+rownames(count_data) <- gbc_ppc_alltps_counts_Filtered[,1]
+
+colData <- data.frame(condition = factor(c("0h","0h","0h","0h","0h","2h","2h","2h","6h","6h","6h","6h","24h","24h"),levels = c("0h","2h","6h", "24h")),batch = factor(c("b1","b1", "b3","b2","b2", "b2","b2","b1","b2","b2", "b3","b3","b2", "b2"),levels = c("b1","b2","b3")))
+colData
+
+count_data
+
+```
+## Differential analysis
+```{r}
+
+normdata <- counts(dds,normalized=TRUE)
+
+colnames(normdata)<-paste("norm",c("T0hA_3191_gbc","T0hB_3191_gbc","T0hA_5641_gbc","T0hA_3568_gbc","T0hB_3568_gbc","T2hA_3568_gbc","T2hB_3568_gbc","T2hB_3191_gbc","T6hA_3568_gbc","T6hB_3568_gbc","T6hA_5641_gbc","T6hB_5641_gbc","T24hA_3568_gbc","T24hB_3568_gbc"),sep="_")
+ 
+result_dTAG47_2hrvs0hrgbc <- results(dds,contrast=c("condition","2h","0h"))
+
+result_dTAG47_6hrvs0hrgbc <- results(dds,contrast=c("condition","6h","0h"))
+
+result_dTAG47_24hrvs0hrgbc <- results(dds,contrast=c("condition","24h","0h"))
+
+
+#2hour differential peaks
+write.table(cbind(gbc_ppc_alltps_counts_Filtered[,1],gbc_ppc_alltps_counts_Filtered[,30:33],count_data,normdata,result_dTAG47_2hrvs0hrgbc),file="/Volumes/Bomber4TB/SMARCA5_PRO-seq_test/3191-3568-5641-R/3191-3568-5641-R-batch-earlydensityfilter/3191-5641-3568DESEQ2.T0hvT2h.GBC.Results.alltps-minus3191T2hA-prefiltered.txt",quote=F,row.names=F,sep="\t")
+
+#6hour differential peaks
+
+write.table(cbind(gbc_ppc_alltps_counts_Filtered[,1],gbc_ppc_alltps_counts_Filtered[,30:33],count_data,normdata,result_dTAG47_6hrvs0hrgbc),file="/Volumes/Bomber4TB/SMARCA5_PRO-seq_test/3191-3568-5641-R/3191-3568-5641-R-batch-earlydensityfilter/3191-5641-3568DESEQ2.T0hvT6h.GBC.Results.alltps-minus3191T2hA-prefiltered.txt",quote=F,row.names=F,sep="\t")
+
+#24hour differential peaks
+write.table(cbind(gbc_ppc_alltps_counts_Filtered[,1],gbc_ppc_alltps_counts_Filtered[,30:33],count_data,normdata,result_dTAG47_24hrvs0hrgbc),file="/Volumes/Bomber4TB/SMARCA5_PRO-seq_test/3191-3568-5641-R/3191-3568-5641-R-batch-earlydensityfilter/3191-5641-3568DESEQ2.T0hvT24h.GBC.Results.alltps-minus3191T2hA-prefiltered.txt",quote=F,row.names=F,sep="\t")
+
+```
+#MA plot and differential analysis 
+```{r}
+result_dTAG47_2hrvs0hrtable_ppc <- read_tsv("3191-5641-3568DESEQ2.T0hvT2h.PPC.Results.alltps-minus3191T2hA-prefiltered.txt")
+result_dTAG47_2hrvs0hrtable_gbc <- read_tsv("3191-5641-3568DESEQ2.T0hvT2h.GBC.Results.alltps-minus3191T2hA-prefiltered.txt")
+result_dTAG47_2hrvs0hrtable <- result_dTAG47_2hrvs0hrtable_ppc %>% left_join(result_dTAG47_2hrvs0hrtable_gbc, by = "Gene_6h", suffix =c("_ppc","_gbc"))
+result_dTAG47_2hrvs0hrtable <- result_dTAG47_2hrvs0hrtable %>% na.omit()
+
+result_dTAG47_2hrvs0hrtable_Filtered_FC <- result_dTAG47_2hrvs0hrtable %>% 
+  mutate(FoldChange_ppc = ((2^(abs(log2FoldChange_ppc)))*sign(log2FoldChange_ppc))) %>% 
+  mutate(FoldChange_gbc = ((2^(abs(log2FoldChange_gbc)))*sign(log2FoldChange_gbc))) %>%
+  transform( category_pp = ifelse((padj_ppc <= 0.05 &  FoldChange_ppc <= -2), "Down_pp", ifelse((padj_ppc <= 0.05 &  FoldChange_ppc >= 2), "Up_pp",  "NS_pp"))) %>%
+  transform( category_gb = ifelse((padj_gbc <= 0.05 &  FoldChange_gbc <= -2), "Down_gb", ifelse((padj_gbc <= 0.05 &  FoldChange_gbc >= 2), "Up_gb",  "NS_gb")))
+
+result_dTAG47_2hrvs0hrtable_Filtered_FC_letter <- result_dTAG47_2hrvs0hrtable %>% 
+  mutate(FoldChange_ppc = ((2^(abs(log2FoldChange_ppc)))*sign(log2FoldChange_ppc))) %>% 
+  mutate(FoldChange_gbc = ((2^(abs(log2FoldChange_gbc)))*sign(log2FoldChange_gbc))) %>%
+  transform( category_pp = ifelse((padj_ppc <= 0.05 &  FoldChange_ppc <= 0), "Down_pp", ifelse((padj_ppc <= 0.05 &  FoldChange_ppc >= 0), "Up_pp",  "NS_pp"))) %>%
+  transform( category_gb = ifelse((padj_gbc <= 0.05 &  FoldChange_gbc <= -2), "Down_gb", ifelse((padj_gbc <= 0.05 &  FoldChange_gbc >= 2), "Up_gb",  "NS_gb")))
+
+dplyr::count(result_dTAG47_2hrvs0hrtable_Filtered_FC_letter, category_pp)
+
+dplyr::count(result_dTAG47_2hrvs0hrtable_Filtered_FC, category_pp)
+
+dplyr::count(result_dTAG47_2hrvs0hrtable_Filtered_FC, category_gb)
+
+KasT2hgbdMAplotGB <- ggplot(result_dTAG47_2hrvs0hrtable_Filtered_FC, aes(y = log2FoldChange_gbc,x = baseMean_gbc, color = category_gb)) +   geom_point( size = 0.35) + theme_monica_nobold() + 
+  theme(panel.border = element_rect(fill=NA, colour = "black", size=1)) +
+  scale_color_manual(breaks = c("Up_gb", "NS_gb", "Down_gb"), values=c('#ca0020','#bababa','#0571b0')) +
+  geom_hline(yintercept=0, linetype="solid", color = "black", size=1) +
+  scale_y_continuous(breaks=seq(-4, 4, 1), limits=c(-4,4)) +
+  #scale_x_continuous(breaks=seq(0, 650, 50), limits=c(0,655)) 
+  scale_x_log10(breaks = c(0.1,1,10,100,1000,10000)) +
+  expand_limits(x=c(0,10000))
+print(KasT2hgbdMAplotGB)
+
+ggsave("3191-3568-5641-T0h.vs.T2hdT.MAplot.GBC.log10xaxis.alltps-minus3191T2hA-prefiltered.tiff", plot = KasT2hgbdMAplotGB,width = 4.25, height = 3, dpi = 300)
+
+KasT2hgbdMAplotPP <- ggplot(result_dTAG47_2hrvs0hrtable_Filtered_FC, aes(y = log2FoldChange_ppc,x = baseMean_ppc, color = category_pp)) +   geom_point( size = 0.35) + theme_monica_nobold() + 
+  theme(panel.border = element_rect(fill=NA, colour = "black", size=1)) +
+  scale_color_manual(breaks = c("Up_pp", "NS_pp", "Down_pp"), values=c('#ca0020','#bababa','#0571b0')) +
+  geom_hline(yintercept=0, linetype="solid", color = "black", size=1) +
+  scale_y_continuous(breaks=seq(-4, 4, 1), limits=c(-4,4)) +
+  #scale_x_continuous(breaks=seq(0, 650, 50), limits=c(0,655)) 
+  scale_x_log10(breaks = c(10,100,1000,10000)) +
+  expand_limits(x=c(0,10000))
+print(KasT2hgbdMAplotPP)
+
+
+ggsave("3191-3568-5641-T0h.vs.T2hdT.MAplot.PPC.log10xaxis.alltps-minus3191T2hA-prefiltered.tiff", plot = KasT2hgbdMAplotPP,width = 4.25, height = 3, dpi = 300)
+
+```
+
+
+
+
