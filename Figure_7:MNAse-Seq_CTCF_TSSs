@@ -27,8 +27,8 @@ samtools index 5872-MB-1.hg19.F4q10.sorted.bam
 ```{conda}
 conda activate Deeptools_April2020
 
-alignmentSieve -b ../5872-MB-3.con.hg19.F4q10.sorted.bam --minFragmentLength 140 --maxFragmentLength 200 -p 6 \
--o 5872-MB-3.con.hg19.F4q10.sorted.alignsieve140-200.BLfiltered.bam -bl /Volumes/BombXtreme/hg19_scer_genomes/hg19_blacklist/hg19.blacklistpeaks.bed
+alignmentSieve -b ../5872-MB-3.con.hg19.F4q10.sorted.bam --minFragmentLength 120 --maxFragmentLength 200 -p 6 \
+-o 5872-MB-3.con.hg19.F4q10.sorted.alignsieve120-210.BLfiltered.bam -bl /Volumes/BombXtreme/hg19_scer_genomes/hg19_blacklist/hg19.blacklistpeaks.bed
 
 conda deactivate 
 ```
@@ -38,7 +38,7 @@ conda deactivate
 ```{conda}
 conda activate FIMO_MEME
 #command 1: make bed file to Fasta file 
-bedtools getfasta -fi {GENOME_DIR}/hg19.fa -bed ../counttable_raw-CTCF-q0.05-removedBLwithDiffbind.BED.txt > 5176_CTCFall.fasta.bed
+bedtools getfasta -fi {GENOME_DIR}/hg19.fa -bed ../counttable_raw-CTCF-q0.01-removedBLwithDiffbind.BED.txt > 5176_CTCFall.fasta.bed
 #command 2: use FIMO, Fasta file, and meme matrix file to get CTCF motifs  
 fimo --oc FIMO_5176_CTCF_parsegc --parse-genomic-coord  ~/Downloads/MA0139.1.meme 5176_CTCFall.fasta.bed.fa.bed
 conda deactivate 
@@ -80,18 +80,19 @@ bedtools merge -i /Volumes/BombXtreme/5176_CutRun_CTCF/5176_CTCF_R-ouput/5176_an
 
 #samtools overlapping CTCF peaks within the bam files 
 samtools view -b -h -L ${GENOME_DIR}/5176.fimo.pargec.motifcenterCTCFplus2kbminus2kb.Granges.noheader.sorted.merged.txt \
-${BAM_DIR}/5872-MB-${i}.con.hg19.F4q10.sorted.alignsieve140-200.BLfiltered.bam \
-> ${PROCESSED_DIR}/5872-MB-${i}.con.hg19.F4q10.sorted.alignsieve140-200.BLfiltered.bam 		
+${BAM_DIR}/5872-MB-${i}.con.hg19.F4q10.sorted.alignsieve120-210.BLfiltered.bam \
+> ${PROCESSED_DIR}/5872-MB-${i}.con.hg19.F4q10.sorted.alignsieve120-210.BLfiltered.bam 		
 
-samtools index ${BAM_DIR}/5872-MB-${i}.con.hg19.F4q10.sorted.alignsieve140-200.BLfiltered.CTCF.bam
+samtools index ${BAM_DIR}/5872-MB-${i}.con.hg19.F4q10.sorted.alignsieve120-210.BLfiltered.CTCF.bam
 ```
 
 #Deeptools create normalized bigwig files with bam files containing isolated CTCF regions
 ```{conda}
 conda activate Deeptools_April2020
 
-bamCoverage -b ${BAM_DIR}/5872-MB-${i}.con.hg19.F4q10.sorted.alignsieve140-200.BLfiltered.CTCF.bam --MNase --normalizeUsing CPM -bs 1 -p 6 -of bigWig \
--o ${PROCESSED_DIR}/5872-MB-${i}.MNase.CPM.CTCFregion.bs1.bw
+bamCoverage -b ${BAM_DIR}/5872-MB-${i}.con.hg19.F4q10.sorted.alignsieve120-210.BLfiltered.CTCF.bam --MNase --normalizeUsing CPM -bs 1 -p 6 -of bigWig \
+--minFragmentLength 130 --maxFragmentLength 210 \
+-o ${PROCESSED_DIR}/5872-MB-${i}.MNase.CPM.CTCFregion.min130.max210.bs1.bw
 
 conda deactivate 
 ```
